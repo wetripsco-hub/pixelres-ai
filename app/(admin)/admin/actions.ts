@@ -3,20 +3,26 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { cookies } from "next/headers"
 
-// Verify if the current session has admin rights
-async function isAdmin() {
+// Verify if the current session has admin rights via DB, Env, or PIN
+export async function isAdmin() {
+  const cookieStore = cookies()
+  const pinCookie = cookieStore.get('admin_pin_access')?.value
+
+  if (pinCookie === 'true') {
+    return true;
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return false;
 
-  // Check against env var
   if (process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL) {
     return true;
   }
 
-  // Or check role in profiles table
   const adminClient = createAdminClient()
   const { data: profile } = await adminClient
     .from('profiles')
@@ -27,6 +33,17 @@ async function isAdmin() {
   return profile?.role === 'admin'
 }
 
+export async function verifyPin(pin: string) {
+  const correctPin = process.env.ADMIN_PIN || '1234'
+  if (pin === correctPin) {
+    const cookieStore = cookies()
+    cookieStore.set('admin_pin_access', 'true', { maxAge: 60 * 60 * 24, httpOnly: true, path: '/admin' })
+    revalidatePath('/admin')
+    return { success: true }
+  }
+  return { success: false, error: 'Invalid PIN' }
+}
+
 export async function generateDownloadUrl(filePath: string) {
   if (!(await isAdmin())) {
     throw new Error("Unauthorized")
@@ -34,7 +51,6 @@ export async function generateDownloadUrl(filePath: string) {
 
   const adminClient = createAdminClient()
 
-  // Generate a signed URL valid for 60 seconds
   const { data, error } = await adminClient.storage
     .from('raw-uploads')
     .createSignedUrl(filePath, 60)
@@ -46,7 +62,6 @@ export async function generateDownloadUrl(filePath: string) {
   return data.signedUrl
 }
 
-// Update order status manually
 export async function updateOrderStatus(orderId: string, status: 'pending' | 'processing' | 'failed') {
   if (!(await isAdmin())) {
     throw new Error("Unauthorized")
@@ -66,32 +81,15 @@ export async function updateOrderStatus(orderId: string, status: 'pending' | 'pr
   return { success: true }
 }
 
-export async function completeOrder(orderId: string, fileDataUrl: string, fileName: string) {
-  if (!(await isAdmin())) {
-    throw new Error("Unauthorized")
-  }
-
-  const adminClient = createAdminClient()
-
-  // For a real production app handling large files,
-  // you'd generate a signed upload URL for the client to upload directly.
-  // Since we have a 5MB/4MB Vercel serverless limit, we'll try direct upload if it's small,
-  // but let's implement the Signed Upload URL method instead.
-
-  throw new Error("Use generateUploadUrl instead for large files")
-}
-
 export async function generateUploadUrl(orderId: string, userId: string, fileExt: string) {
   if (!(await isAdmin())) {
     throw new Error("Unauthorized")
   }
 
   const adminClient = createAdminClient()
-  // Path pattern: deliverables/[user_id]/[order_id]_upscaled.[ext]
   const uid = userId || 'guest'
   const filePath = `deliverables/${uid}/${orderId}_upscaled.${fileExt}`
 
-  // createSignedUploadUrl is available in supabase-js
   const { data, error } = await adminClient.storage
     .from('upscaled-outputs')
     .createSignedUploadUrl(filePath)

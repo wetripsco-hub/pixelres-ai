@@ -1,32 +1,13 @@
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
+import { isAdmin } from "./actions"
 import { AdminDashboardClient } from "./AdminDashboardClient"
+import { PinLoginClient } from "./PinLoginClient"
 
 export default async function AdminPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const isAuthorized = await isAdmin()
 
-  if (!user) {
-    redirect("/login")
-  }
-
-  // Check Admin Authorization
-  let isAdmin = false;
-  if (process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL) {
-    isAdmin = true;
-  } else {
-    const adminClient = createAdminClient()
-    const { data: profile } = await adminClient
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    if (profile?.role === 'admin') isAdmin = true;
-  }
-
-  if (!isAdmin) {
-    redirect("/dashboard")
+  if (!isAuthorized) {
+    return <PinLoginClient />
   }
 
   // Fetch all orders using Admin Client (bypasses RLS)
