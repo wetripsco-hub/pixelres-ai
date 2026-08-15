@@ -1,45 +1,57 @@
-import { NextResponse } from "next/server"
-import { headers } from "next/headers"
-import { stripe } from "@/lib/stripe"
+import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { createAdminClient } from '@/lib/supabase/admin';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
+  apiVersion: '2025-02-24.acacia',
+});
+
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 export async function POST(req: Request) {
-  const body = await req.text()
-  const headerList = await headers()
-  const signature = headerList.get("stripe-signature")
+  const body = await req.text();
+  const sig = req.headers.get('stripe-signature');
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
-
-  let event: any
+  let event: Stripe.Event;
 
   try {
-    if (webhookSecret && signature && webhookSecret !== "whsec_your_stripe_webhook_secret") {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
-    } else {
-      // Development mode fallback when real webhook secret is not configured
-      event = JSON.parse(body)
+    if (!sig || !endpointSecret) {
+      throw new Error('Missing Stripe signature or webhook secret');
     }
+    event = stripe.webhooks.constructEvent(body, sig, endpointSecret);
   } catch (err: any) {
-    console.error(`Webhook signature verification failed: ${err.message}`)
-    return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 })
+    console.error(`Webhook Error: ${err.message}`);
+    return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
   }
 
-  // Handle Stripe Webhook Events
-  switch (event.type) {
-    case "checkout.session.completed": {
-      const session = event.data.object
-      const creditsAllocated = session.metadata?.credits
-      console.log(`[Stripe Webhook] Payment received for session ${session.id}. Credits: ${creditsAllocated}`)
-      // Update Supabase DB user credits balance here
-      break
+  // Handle the event
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+
+    // Retrieve metadata
+    const orderId = session.metadata?.orderId;
+
+    if (orderId) {
+      const adminClient = createAdminClient();
+
+      // Update the order in Supabase
+      const { error } = await adminClient
+        .from('orders')
+        .update({
+          status: 'processing',
+          amount_paid: session.amount_total ? session.amount_total / 100 : 0,
+          currency: session.currency?.toUpperCase() || 'USD'
+        })
+        .eq('id', orderId);
+
+      if (error) {
+        console.error('Error updating order status:', error);
+        return NextResponse.json({ error: 'Failed to update order in database' }, { status: 500 });
+      }
+
+      console.log(`Order ${orderId} successfully marked as processing.`);
     }
-    case "payment_intent.succeeded": {
-      const paymentIntent = event.data.object
-      console.log(`[Stripe Webhook] PaymentIntent ${paymentIntent.id} succeeded.`)
-      break
-    }
-    default:
-      console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`)
   }
 
-  return NextResponse.json({ received: true })
+  return NextResponse.json({ received: true });
 }

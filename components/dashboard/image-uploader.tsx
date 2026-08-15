@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { UploadCloud, Image as ImageIcon, X, Loader2, Info } from "lucide-react";
+import { UploadCloud, Image as ImageIcon, X, Loader2, Info, CreditCard } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -30,7 +30,6 @@ export function ImageUploader({ countryCode, initialTier = "4k", onUploadSuccess
   const supabase = createClient();
 
   useEffect(() => {
-    // If the URL passes a valid tier, update the state
     if (initialTier && pricingTiers.some(t => t.tier === initialTier)) {
       setSelectedTier(initialTier);
     }
@@ -40,7 +39,6 @@ export function ImageUploader({ countryCode, initialTier = "4k", onUploadSuccess
     setError(null);
     if (acceptedFiles.length > 0) {
       const selectedFile = acceptedFiles[0];
-      // Max 25MB check
       if (selectedFile.size > 25 * 1024 * 1024) {
         setError("File exceeds 25MB limit.");
         return;
@@ -69,7 +67,7 @@ export function ImageUploader({ countryCode, initialTier = "4k", onUploadSuccess
     setError(null);
   };
 
-  const handleUpload = async () => {
+  const handleUploadAndCheckout = async () => {
     if (!file) return;
 
     setIsUploading(true);
@@ -83,9 +81,8 @@ export function ImageUploader({ countryCode, initialTier = "4k", onUploadSuccess
       const fileExt = file.name.split('.').pop();
       const filePath = `${userId}/${orderId}.${fileExt}`;
 
-      // Upload to Storage
       setUploadProgress(40);
-      const { error: uploadError, data: uploadData } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('raw-uploads')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -96,40 +93,48 @@ export function ImageUploader({ countryCode, initialTier = "4k", onUploadSuccess
 
       setUploadProgress(80);
 
-      // Get public URL or signed URL (if private, you might need a signed URL, but we save path)
-      const { data: { publicUrl } } = supabase.storage.from('raw-uploads').getPublicUrl(filePath);
-      // Note: 'raw-uploads' is private, so publicUrl won't work directly without RLS or signed url.
-      // But we just store the filePath or publicUrl structure in DB and the edge function handles it.
-      // Alternatively, just store the full path. We'll store the object path.
-
-      // Insert Order
       const { error: insertError } = await supabase.from('orders').insert({
         id: orderId,
-        user_id: user?.id || null, // null if guest
+        user_id: user?.id || null,
         original_image_url: filePath,
         target_resolution: selectedTier,
         enhancement_type: enhancementType,
         currency: activePricing.currency,
         amount_paid: activePricing.price,
-        status: 'pending'
+        status: 'pending' // Remains pending until Stripe webhook triggers
       });
 
       if (insertError) throw new Error(insertError.message);
 
       setUploadProgress(100);
 
-      // Reset after brief delay
-      setTimeout(() => {
-        setFile(null);
-        setPreviewUrl(null);
-        setIsUploading(false);
-        setUploadProgress(0);
-        if (onUploadSuccess) onUploadSuccess();
-      }, 1000);
+      // Call Stripe Checkout Endpoint
+      const checkoutResponse = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          tier: selectedTier,
+          enhancementType,
+          currency: activePricing.currency,
+          amount: activePricing.price,
+          customerEmail: user?.email,
+          userId: user?.id
+        })
+      });
+
+      const checkoutData = await checkoutResponse.json();
+
+      if (!checkoutResponse.ok) {
+        throw new Error(checkoutData.error || 'Failed to initialize checkout');
+      }
+
+      // Redirect to Stripe
+      window.location.href = checkoutData.url;
 
     } catch (err: any) {
-      console.error("Upload error:", err);
-      setError(err.message || "Failed to upload image. Please try again.");
+      console.error("Upload/Checkout error:", err);
+      setError(err.message || "An error occurred. Please try again.");
       setIsUploading(false);
       setUploadProgress(0);
     }
@@ -148,7 +153,6 @@ export function ImageUploader({ countryCode, initialTier = "4k", onUploadSuccess
       </CardHeader>
 
       <CardContent className="space-y-8">
-        {/* Dropzone */}
         <div
           {...getRootProps()}
           className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer relative overflow-hidden ${
@@ -191,7 +195,7 @@ export function ImageUploader({ countryCode, initialTier = "4k", onUploadSuccess
               <div className="w-64 bg-slate-800 rounded-full h-2 mb-2">
                 <div className="bg-cyan-500 h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
               </div>
-              <span className="text-cyan-400 font-medium">{uploadProgress}%</span>
+              <span className="text-cyan-400 font-medium">{uploadProgress < 100 ? `${uploadProgress}%` : "Redirecting to checkout..."}</span>
             </div>
           )}
         </div>
@@ -204,7 +208,6 @@ export function ImageUploader({ countryCode, initialTier = "4k", onUploadSuccess
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Resolution Selector */}
           <div className="space-y-4">
             <Label className="text-slate-200 font-semibold text-base">Output Resolution</Label>
             <RadioGroup value={selectedTier} onValueChange={setSelectedTier} disabled={isUploading}>
@@ -223,7 +226,6 @@ export function ImageUploader({ countryCode, initialTier = "4k", onUploadSuccess
             </RadioGroup>
           </div>
 
-          {/* Enhancement Type */}
           <div className="space-y-4">
             <Label className="text-slate-200 font-semibold text-base">Enhancement Type</Label>
             <RadioGroup value={enhancementType} onValueChange={setEnhancementType} disabled={isUploading}>
@@ -257,11 +259,16 @@ export function ImageUploader({ countryCode, initialTier = "4k", onUploadSuccess
           <span className="font-bold text-white text-lg">{activePricing.formattedPrice}</span>
         </div>
         <Button
-          onClick={handleUpload}
+          onClick={handleUploadAndCheckout}
           disabled={!file || isUploading}
-          className="bg-cyan-600 hover:bg-cyan-500 text-white min-w-[150px]"
+          className="bg-cyan-600 hover:bg-cyan-500 text-white min-w-[150px] flex items-center gap-2"
         >
-          {isUploading ? "Processing..." : "Start Enhancement"}
+          {isUploading ? "Processing..." : (
+             <>
+               <CreditCard className="h-4 w-4" />
+               Proceed to Checkout
+             </>
+          )}
         </Button>
       </CardFooter>
     </Card>
