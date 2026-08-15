@@ -1,17 +1,51 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slider";
 import { Zap, Layers, Cpu, ArrowRight, ImageIcon, Sparkles, Globe, Star } from "lucide-react";
+import { ResolutionTier, getAllPricingTiers, PricingInfo } from "@/lib/pricing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { ImageUploader } from "@/components/dashboard/image-uploader";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
-export function MarketingClient() {
+interface MarketingClientProps {
+  initialCountryCode: string;
+}
+
+export function MarketingClient({ initialCountryCode }: MarketingClientProps) {
+  const [selectedTier, setSelectedTier] = useState<ResolutionTier>("4k");
+  const [countryCode, setCountryCode] = useState(initialCountryCode);
+
+  // Client-side Geo-IP fallback
+  useEffect(() => {
+    fetch('https://ipapi.co/json/')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.country_code) {
+          setCountryCode(data.country_code);
+        }
+      })
+      .catch(err => console.error('Geo-IP fetch failed:', err));
+  }, []);
+
+  const pricingTiers = getAllPricingTiers(countryCode);
+
+  const scrollToUpload = (tier?: ResolutionTier) => {
+    if (tier) setSelectedTier(tier);
+    // Instead of scrolling to upload, we'll direct them to the studio page,
+    // passing the selected tier as a URL parameter if provided.
+    if (tier) {
+       window.location.href = `/studio?tier=${tier}`;
+    } else {
+       window.location.href = '/studio';
+    }
+  };
+
   return (
-    <div className="w-full text-slate-50">
+    <div className="w-full">
       {/* Hero Section */}
       <section className="pt-32 pb-24 px-4 sm:px-8 max-w-7xl mx-auto text-center relative z-10">
         <motion.div
@@ -52,23 +86,22 @@ export function MarketingClient() {
           transition={{ duration: 0.5, delay: 0.3 }}
           className="flex flex-col sm:flex-row items-center justify-center gap-4"
         >
-          <Link href="/studio" className="w-full sm:w-auto">
-            <Button
-              className="w-full h-14 px-10 text-lg font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded-full transition-all hover:scale-105 shadow-[0_0_30px_rgba(6,182,212,0.4)]"
-            >
-              <ImageIcon className="mr-2 h-5 w-5" />
-              Try Studio Free
-            </Button>
-          </Link>
-          <Link href="/pricing" className="w-full sm:w-auto">
-            <Button
-              variant="outline"
-              className="w-full h-14 px-10 text-lg font-medium rounded-full border-slate-700 bg-slate-900/50 hover:bg-slate-800 hover:text-white backdrop-blur-sm transition-all hover:scale-105"
-            >
-              View Pricing
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </Link>
+          <Button
+            onClick={() => scrollToUpload()}
+            className="w-full sm:w-auto h-14 px-10 text-lg font-semibold bg-gradient-to-r from-[#00d2ff] to-[#3a7bd5] hover:opacity-90 text-white rounded-full transition-transform hover:scale-105 shadow-[0_0_30px_rgba(6,182,212,0.4)]"
+          >
+            Upscale Your Photos Now
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="w-full sm:w-auto h-14 px-10 text-lg font-medium rounded-full border-slate-700 bg-slate-900/50 hover:bg-slate-800 hover:text-white backdrop-blur-sm transition-transform hover:scale-105"
+          >
+            View Interactive Demo
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
         </motion.div>
       </section>
 
@@ -255,7 +288,7 @@ export function MarketingClient() {
            Ready for your masterpiece?
          </h2>
          <Link href="/studio">
-           <Button className="h-14 px-10 text-lg font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded-full transition-all hover:scale-105 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
+           <Button className="h-14 px-10 text-lg font-semibold bg-gradient-to-r from-[#00d2ff] to-[#3a7bd5] hover:opacity-90 text-white rounded-full transition-transform hover:scale-105 shadow-[0_0_30px_rgba(6,182,212,0.4)]">
              Launch Studio
            </Button>
          </Link>
