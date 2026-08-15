@@ -1,8 +1,12 @@
 export const dynamic = 'force-dynamic';
 
-import { MarketingClient } from "./MarketingClient";
+import { headers } from "next/headers";
+import { PricingClient } from "./PricingClient";
 
-export default function MarketingPage() {
+export default function PricingPage() {
+  const headersList = headers();
+  const countryCode = headersList.get('x-user-country') || 'US';
+
   return (
     <>
       {/* Background Gradients */}
@@ -12,8 +16,8 @@ export default function MarketingPage() {
         <div className="absolute inset-0 bg-[url('https://res.cloudinary.com/dzvy8pbbm/image/upload/v1709668478/grid-pattern_q5m9i2.svg')] bg-repeat opacity-[0.03]" />
       </div>
 
-      <main className="relative z-10">
-        <MarketingClient />
+      <main className="relative z-10 pt-24 pb-32">
+        <PricingClient initialCountryCode={countryCode} />
       </main>
     </>
   );
