@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import confetti from "canvas-confetti";
 
 interface Order {
   id: string;
@@ -37,7 +38,19 @@ export function DashboardClient({ countryCode }: DashboardClientProps) {
 
   const supabase = createClient();
 
+
   useEffect(() => {
+    const payment = searchParams.get('payment');
+    if (payment === 'success') {
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#22d3ee', '#8b5cf6', '#ffffff']
+      });
+      router.replace('/dashboard', undefined);
+    }
+
     const fetchUserAndOrders = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
