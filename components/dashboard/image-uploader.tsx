@@ -105,18 +105,18 @@ export function ImageUploader({
 
 
       // 1. Create the order record securely on the server
-      const orderResponse = await fetch('/api/orders', {
+      const orderResponse = await fetch('/api/orders/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: orderId,
-          user_id: user?.id || null,
-          customer_email: user?.email || null,
-          original_image_url: filePath,
-          target_resolution: selectedTier,
-          enhancement_type: enhancementType,
+          orderId: orderId,
+          userId: user?.id || null,
+          customerEmail: user?.email || null,
+          filePath: filePath,
+          targetResolution: selectedTier,
+          enhancementType: enhancementType,
           currency: activePricing.currency,
-          amount_paid: activePricing.price,
+          amountPaid: activePricing.price,
         })
       });
 
