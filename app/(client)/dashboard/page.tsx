@@ -30,12 +30,12 @@ export default async function DashboardPage({
       .is("user_id", null);
   }
 
-  // Also link any unlinked guest orders matching this user's email
+  // Also link any unlinked guest orders (matching this user's email or with empty email)
   if (userEmail) {
     await adminClient
       .from("orders")
-      .update({ user_id: userId })
-      .eq("guest_email", userEmail)
+      .update({ user_id: userId, guest_email: userEmail })
+      .or(`guest_email.eq.${userEmail},guest_email.is.null`)
       .is("user_id", null);
   }
 

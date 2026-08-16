@@ -126,6 +126,7 @@ export function ImageUploader({
         body: JSON.stringify({
           orderId,
           userId: user?.id || null,
+          customerEmail: user?.email || null,
           filePath,
           targetResolution: selectedTier,
           enhancementType,

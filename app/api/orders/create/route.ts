@@ -21,8 +21,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Determine the real authenticated user (if any)
     let authenticatedUserId: string | null = null;
+    let safeCustomerEmail: string | null = customerEmail || null;
+
     try {
       const cookieStore = cookies();
       const supabase = createServerClient(
@@ -44,6 +45,9 @@ export async function POST(req: Request) {
       );
       const { data: { user } } = await supabase.auth.getUser();
       authenticatedUserId = user?.id || null;
+      if (user?.email && !safeCustomerEmail) {
+        safeCustomerEmail = user.email;
+      }
     } catch {
       // Guest checkout — authenticatedUserId stays null
     }
@@ -57,7 +61,7 @@ export async function POST(req: Request) {
     const { error: insertError } = await adminClient.from("orders").insert({
       id: orderId,
       user_id: safeUserId,
-      guest_email: customerEmail || null,
+      guest_email: safeCustomerEmail,
       original_image_url: filePath,
       target_resolution: targetResolution,
       enhancement_type: enhancementType || "general",
