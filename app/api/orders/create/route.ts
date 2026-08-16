@@ -11,23 +11,23 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    const { data, error } = await supabaseAdmin.from('orders').insert([
-      {
-        id: orderId,
-        user_id: userId || null,
-        guest_email: customerEmail || null,
-        original_image_url: filePath,
-        target_resolution: targetResolution,
-        enhancement_type: enhancementType,
-        currency: currency || 'USD',
-        amount_paid: amountPaid || 0,
-        status: 'pending'
-      }
-    ]);
+    const { data, error } = await supabaseAdmin.from('orders').upsert({
+      id: orderId,
+      user_id: userId || null,
+      guest_email: customerEmail || null,
+      customer_email: customerEmail || null,
+      original_image_url: filePath,
+      target_resolution: targetResolution,
+      enhancement_type: enhancementType,
+      currency: currency || 'USD',
+      amount_paid: amountPaid || 0,
+      status: 'processing', // mark as processing upon checkout/success
+      created_at: new Date().toISOString()
+    });
 
     if (error) {
-      console.error('Supabase DB Insert Error:', error);
-      return NextResponse.json({ success: true, warning: error.message });
+      console.error('CRITICAL DB INSERT ERROR:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, data });

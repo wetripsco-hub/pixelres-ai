@@ -52,39 +52,37 @@ export function DashboardClient({ countryCode }: DashboardClientProps) {
     }
 
     const fetchUserAndOrders = async () => {
+      setIsLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
 
-      // Fetch initial orders
-      const query = supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-
       if (user) {
-        query.eq('user_id', user.id);
+        const { data: orders } = await supabase
+          .from('orders')
+          .select('*')
+          .or(`user_id.eq.${user.id},guest_email.eq.${user.email}`)
+          .order('created_at', { ascending: false });
+
+        if (orders) setOrders(orders as Order[]);
       } else {
-        // If guest, maybe we store order IDs in local storage?
-        // For now, if guest, we won't show history unless they just created it.
-        // Or we could fall back to local storage tracked IDs.
         const guestOrders = JSON.parse(localStorage.getItem('guest_orders') || '[]');
         if (guestOrders.length > 0) {
-          query.in('id', guestOrders);
+          const { data: orders } = await supabase
+            .from('orders')
+            .select('*')
+            .in('id', guestOrders)
+            .order('created_at', { ascending: false });
+          if (orders) setOrders(orders as Order[]);
         } else {
           setOrders([]);
-          setIsLoading(false);
-          return;
         }
-      }
-
-      const { data, error } = await query;
-      if (!error && data) {
-        setOrders(data as Order[]);
       }
       setIsLoading(false);
     };
 
     fetchUserAndOrders();
+    // Expose this function globally or attach to a ref if needed, or we can just redefine it outside useEffect
+    (window as any).refreshOrders = fetchUserAndOrders;
 
     // Subscribe to real-time changes for the orders table
     const channel = supabase
@@ -197,9 +195,14 @@ export function DashboardClient({ countryCode }: DashboardClientProps) {
                 <span className="flex items-center gap-2">
                   <History className="h-5 w-5 text-cyan-400" /> Recent Enhancements
                 </span>
-                <Badge variant="outline" className="text-xs border-slate-700 text-slate-400">
-                  {orders.length} Orders
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs border-slate-700 text-slate-400 hover:text-cyan-400" onClick={() => (window as any).refreshOrders && (window as any).refreshOrders()}>
+                    Refresh
+                  </Button>
+                  <Badge variant="outline" className="text-xs border-slate-700 text-slate-400">
+                    {orders.length} Orders
+                  </Badge>
+                </div>
               </CardTitle>
               <CardDescription className="text-slate-400">
                 Track status and download your upscaled high-resolution renders.
