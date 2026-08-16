@@ -11,13 +11,21 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { getAllPricingTiers, ResolutionTier, PricingInfo } from "@/lib/pricing";
 import { motion, AnimatePresence } from "framer-motion";
 
-interface ImageUploaderProps {
-  countryCode: string;
+
+
+export interface ImageUploaderProps {
+  countryCode?: string;
   initialTier?: string;
+  dynamicPricing?: any;
   onUploadSuccess?: () => void;
 }
 
-export function ImageUploader({ countryCode, initialTier = "4k", onUploadSuccess }: ImageUploaderProps) {
+export function ImageUploader({
+  countryCode = 'US',
+  initialTier = '4k',
+  dynamicPricing = null,
+  onUploadSuccess
+}: ImageUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
