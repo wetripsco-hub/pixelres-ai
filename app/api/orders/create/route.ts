@@ -55,29 +55,26 @@ export async function POST(req: Request) {
     // NEVER insert the string "guest" — always use null to prevent FK constraint errors
     const safeUserId = authenticatedUserId || (userId && userId !== "guest" ? userId : null);
 
-    // Use admin client (SERVICE_ROLE_KEY) to completely bypass RLS
-    const adminClient = createAdminClient();
+    // Create admin client with SUPABASE_SERVICE_ROLE_KEY to bypass RLS
+    const supabaseAdmin = createAdminClient();
 
-    const { error: insertError } = await adminClient.from("orders").insert({
+    // Perform strict upsert into orders table
+    const { error: upsertError } = await supabaseAdmin.from("orders").upsert({
       id: orderId,
       user_id: safeUserId,
       guest_email: safeCustomerEmail,
       original_image_url: filePath,
       target_resolution: targetResolution,
       enhancement_type: enhancementType || "general",
-      currency,
-      amount_paid: amountPaid,
-      status: "pending",
+      currency: currency || "USD",
+      amount_paid: amountPaid || 0,
+      status: "processing", // mark as processing upon checkout/success
+      created_at: new Date().toISOString(),
     });
 
-    if (insertError) {
-      console.error("Order insert error:", insertError);
-      // Return success anyway so checkout is never blocked by non-fatal DB issues
-      return NextResponse.json({
-        success: true,
-        orderId,
-        warning: insertError.message,
-      });
+    if (upsertError) {
+      console.error("CRITICAL DB INSERT ERROR:", upsertError);
+      return NextResponse.json({ error: upsertError.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, orderId });
