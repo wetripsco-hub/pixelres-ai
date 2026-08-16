@@ -1,5 +1,6 @@
 import { DashboardClient } from "./DashboardClient";
 import { headers } from "next/headers";
+import { Suspense } from "react";
 
 export default function DashboardPage() {
   const headersList = headers();
