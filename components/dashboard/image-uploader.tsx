@@ -102,21 +102,32 @@ export function ImageUploader({
 
       setUploadProgress(80);
 
-      const { error: insertError } = await supabase.from('orders').insert({
-        id: orderId,
-        user_id: user?.id || null,
-        original_image_url: filePath,
-        target_resolution: selectedTier,
-        enhancement_type: enhancementType,
-        currency: activePricing.currency,
-        amount_paid: activePricing.price,
-        status: 'pending' // Remains pending until Stripe webhook triggers
+
+
+      // 1. Create the order record securely on the server
+      const orderResponse = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: orderId,
+          user_id: user?.id || 'guest',
+          customer_email: user?.email || null,
+          original_image_url: filePath,
+          target_resolution: selectedTier,
+          enhancement_type: enhancementType,
+          currency: activePricing.currency,
+          amount_paid: activePricing.price,
+        })
       });
 
-      if (insertError) throw new Error(insertError.message);
+      const orderData = await orderResponse.json();
+      if (!orderResponse.ok) {
+        throw new Error(orderData.error || 'Failed to create order');
+      }
 
       setUploadProgress(100);
 
+      // 2. Init Stripe Checkout
       const checkoutResponse = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
