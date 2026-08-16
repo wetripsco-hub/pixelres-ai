@@ -112,16 +112,19 @@ export function StudioImageUploader({
 
       setUploadProgress(25);
 
-      // 2. Upload raw image to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from("raw-uploads")
-        .upload(storagePath, file, { cacheControl: "3600", upsert: false });
+      // 2. Upload raw image securely via server API (bypasses Storage RLS)
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
+      uploadFormData.append("path", storagePath);
 
-      if (uploadError) {
-        if (uploadError.message.includes("Bucket not found") || uploadError.message.includes("not found")) {
-          throw new Error("Storage bucket 'raw-uploads' is not configured. Please contact support.");
-        }
-        throw new Error(`Upload failed: ${uploadError.message}`);
+      const uploadRes = await fetch("/api/upload/raw", {
+        method: "POST",
+        body: uploadFormData,
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.error || "Failed to upload image.");
       }
 
       setUploadProgress(50);

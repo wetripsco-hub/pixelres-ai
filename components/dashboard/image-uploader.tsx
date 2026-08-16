@@ -102,15 +102,20 @@ export function ImageUploader({
 
       setUploadProgress(30);
 
-      // Upload file to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('raw-uploads')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      // Upload file to Supabase Storage via server API (bypasses Storage RLS)
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
+      uploadFormData.append("path", filePath);
 
-      if (uploadError) throw new Error(uploadError.message);
+      const uploadRes = await fetch("/api/upload/raw", {
+        method: "POST",
+        body: uploadFormData,
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.error || "Failed to upload image.");
+      }
 
       setUploadProgress(60);
 
