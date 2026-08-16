@@ -1,0 +1,395 @@
+"use client";
+
+import React, { useState, useCallback, useEffect } from "react";
+import { useDropzone } from "react-dropzone";
+import { UploadCloud, Image as ImageIcon, X, Loader2, Info, CreditCard, AlertTriangle } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { getAllPricingTiersDynamic, getAllPricingTiers, PricingInfo } from "@/lib/pricing";
+import { motion, AnimatePresence } from "framer-motion";
+
+export interface StudioImageUploaderProps {
+  countryCode?: string;
+  initialTier?: string;
+}
+
+export function StudioImageUploader({
+  countryCode = "US",
+  initialTier = "4k",
+}: StudioImageUploaderProps) {
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedTier, setSelectedTier] = useState<string>(initialTier);
+  const [enhancementType, setEnhancementType] = useState<string>("general");
+
+  // Pricing: start with sync fallback, then load dynamic
+  const [pricingTiers, setPricingTiers] = useState<PricingInfo[]>(getAllPricingTiers(countryCode));
+  const [isLoadingPricing, setIsLoadingPricing] = useState(true);
+
+  const activePricing = pricingTiers.find((t) => t.tier === selectedTier) || pricingTiers[1];
+  const supabase = createClient();
+
+  // Load dynamic pricing on mount
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingPricing(true);
+    getAllPricingTiersDynamic(countryCode)
+      .then((tiers) => {
+        if (!cancelled) {
+          setPricingTiers(tiers);
+          setIsLoadingPricing(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setIsLoadingPricing(false);
+      });
+    return () => { cancelled = true; };
+  }, [countryCode]);
+
+  // File drop handler with validation
+  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
+    setError(null);
+    if (rejectedFiles.length > 0) {
+      const rejection = rejectedFiles[0];
+      if (rejection.errors?.[0]?.code === "file-too-large") {
+        setError("File exceeds 25 MB limit.");
+      } else if (rejection.errors?.[0]?.code === "file-invalid-type") {
+        setError("Unsupported format. Please upload JPG, PNG, or WEBP.");
+      } else {
+        setError("File rejected. Please try a different image.");
+      }
+      return;
+    }
+    if (acceptedFiles.length > 0) {
+      const selectedFile = acceptedFiles[0];
+      setFile(selectedFile);
+      setPreviewUrl(URL.createObjectURL(selectedFile));
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+    onDrop,
+    accept: {
+      "image/jpeg": [".jpeg", ".jpg"],
+      "image/png": [".png"],
+      "image/webp": [".webp"],
+    },
+    maxFiles: 1,
+    maxSize: 25 * 1024 * 1024,
+    disabled: isUploading,
+    noClick: false,
+    noKeyboard: false,
+  });
+
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFile(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setError(null);
+  };
+
+  const handleUploadAndCheckout = async () => {
+    if (!file) return;
+
+    setIsUploading(true);
+    setError(null);
+    setUploadProgress(10);
+
+    try {
+      // 1. Check auth session
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || null;
+      const orderId = crypto.randomUUID();
+      const fileExt = file.name.split(".").pop() || "jpg";
+      const storagePath = `${userId || "guest"}/${orderId}.${fileExt}`;
+
+      setUploadProgress(25);
+
+      // 2. Upload raw image to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from("raw-uploads")
+        .upload(storagePath, file, { cacheControl: "3600", upsert: false });
+
+      if (uploadError) {
+        if (uploadError.message.includes("Bucket not found") || uploadError.message.includes("not found")) {
+          throw new Error("Storage bucket 'raw-uploads' is not configured. Please contact support.");
+        }
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      setUploadProgress(50);
+
+      // 3. Create order via server-side route (bypasses RLS)
+      const orderRes = await fetch("/api/orders/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          userId,
+          customerEmail: user?.email || null,
+          filePath: storagePath,
+          targetResolution: selectedTier,
+          enhancementType,
+          currency: activePricing.currency,
+          amountPaid: activePricing.price,
+        }),
+      });
+
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) {
+        throw new Error(orderData.error || "Failed to create order record.");
+      }
+
+      setUploadProgress(75);
+
+      // 4. Create Stripe checkout session
+      const checkoutRes = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          tier: selectedTier,
+          enhancementType,
+          currency: activePricing.currency,
+          amount: activePricing.price,
+          customerEmail: user?.email,
+          userId,
+        }),
+      });
+
+      const checkoutData = await checkoutRes.json();
+      if (!checkoutRes.ok) {
+        throw new Error(checkoutData.error || "Failed to initialize checkout.");
+      }
+
+      setUploadProgress(100);
+
+      // 5. Redirect to Stripe (or sandbox fallback)
+      if (checkoutData.url) {
+        window.location.href = checkoutData.url;
+      } else {
+        throw new Error("No checkout URL returned.");
+      }
+    } catch (err: any) {
+      console.error("Upload/Checkout error:", err);
+      setError(err.message || "An unexpected error occurred. Please try again.");
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  return (
+    <Card className="bg-slate-950/40 border-slate-800/80 shadow-2xl w-full max-w-4xl mx-auto rounded-[2rem] overflow-hidden backdrop-blur-md">
+      <CardHeader className="bg-slate-900/40 border-b border-slate-800/50 p-6 sm:p-8">
+        <CardTitle className="text-2xl text-slate-100 flex items-center gap-3 font-bold">
+          <div className="h-10 w-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <UploadCloud className="h-5 w-5" />
+          </div>
+          New Enhancement Order
+        </CardTitle>
+        <CardDescription className="text-slate-400 text-base mt-2">
+          Upload your image and configure the AI enhancement parameters.
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="p-6 sm:p-8 space-y-8">
+        {/* ── Full-area clickable dropzone ── */}
+        <div
+          {...getRootProps()}
+          className={`border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center transition-all duration-300 cursor-pointer relative overflow-hidden group ${
+            isDragActive
+              ? "border-cyan-500 bg-cyan-950/20 shadow-[inset_0_0_50px_rgba(6,182,212,0.1)]"
+              : file
+              ? "border-slate-700 bg-slate-900/50"
+              : "border-slate-700 bg-slate-900/30 hover:border-slate-500 hover:bg-slate-900/50"
+          } ${isUploading ? "pointer-events-none opacity-80" : ""}`}
+        >
+          <input {...getInputProps()} />
+
+          <AnimatePresence mode="wait">
+            {previewUrl ? (
+              <motion.div
+                key="preview"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative w-full max-h-[400px] flex items-center justify-center"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt="Preview"
+                  className="max-h-[400px] max-w-full rounded-xl object-contain shadow-2xl"
+                />
+                {!isUploading && (
+                  <button
+                    onClick={handleClear}
+                    className="absolute top-4 right-4 bg-slate-950/80 hover:bg-red-500 text-white rounded-full p-2.5 backdrop-blur-md transition-colors shadow-lg z-30"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="placeholder"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center py-8 pointer-events-none"
+              >
+                <div className="h-20 w-20 bg-slate-800/80 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-slate-800 transition-all duration-300 shadow-xl border border-slate-700">
+                  {isLoadingPricing ? (
+                    <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
+                  ) : (
+                    <ImageIcon className="h-10 w-10 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                  )}
+                </div>
+                <p className="text-slate-200 font-semibold text-lg mb-2">
+                  {isDragActive ? "Drop the image here" : "Drag & drop an image, or click to browse"}
+                </p>
+                <p className="text-sm text-slate-500 font-medium">
+                  Supports PNG, JPG, WEBP up to 25 MB
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {isUploading && (
+            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center z-10 rounded-2xl">
+              <Loader2 className="h-12 w-12 text-cyan-400 animate-spin mb-6" />
+              <div className="w-72 bg-slate-800/50 rounded-full h-3 mb-3 border border-slate-700/50 overflow-hidden p-0.5">
+                <div
+                  className="bg-gradient-to-r from-cyan-600 to-cyan-400 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(6,182,212,0.5)]"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+              <span className="text-cyan-100 font-medium text-lg">
+                {uploadProgress < 100 ? `${uploadProgress}%` : "Redirecting to checkout…"}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* ── Error alert ── */}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0" />
+            {error}
+          </div>
+        )}
+
+        {/* ── Resolution & Enhancement selectors ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+          {/* Resolution */}
+          <div className="space-y-5">
+            <Label className="text-slate-100 font-bold text-lg flex items-center gap-2">
+              <span className="bg-cyan-500/20 text-cyan-400 h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold">1</span>
+              Output Resolution
+            </Label>
+            <RadioGroup value={selectedTier} onValueChange={setSelectedTier} disabled={isUploading} className="gap-3">
+              {pricingTiers.map((tier) => (
+                <label
+                  key={tier.tier}
+                  htmlFor={`studio-res-${tier.tier}`}
+                  className={`flex items-start space-x-3 border rounded-xl p-4 transition-all duration-200 cursor-pointer ${
+                    selectedTier === tier.tier
+                      ? "border-cyan-500 bg-cyan-500/5 shadow-[0_0_15px_rgba(6,182,212,0.1)]"
+                      : "border-slate-800 bg-slate-900/40 hover:bg-slate-900/80 hover:border-slate-700"
+                  }`}
+                >
+                  <RadioGroupItem value={tier.tier} id={`studio-res-${tier.tier}`} className="border-slate-500 text-cyan-500 mt-0.5" />
+                  <div className="flex-1 w-full">
+                    <div className="font-bold text-slate-200 flex items-center justify-between w-full text-base">
+                      <span>{tier.label}</span>
+                      <span className="text-cyan-400">
+                        {isLoadingPricing ? <Loader2 className="h-4 w-4 animate-spin inline" /> : tier.formattedPrice}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-500 mt-1">{tier.description}</p>
+                  </div>
+                </label>
+              ))}
+            </RadioGroup>
+          </div>
+
+          {/* Enhancement Type */}
+          <div className="space-y-5">
+            <Label className="text-slate-100 font-bold text-lg flex items-center gap-2">
+              <span className="bg-violet-500/20 text-violet-400 h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold">2</span>
+              Enhancement Type
+            </Label>
+            <RadioGroup value={enhancementType} onValueChange={setEnhancementType} disabled={isUploading} className="gap-3">
+              <label
+                htmlFor="studio-type-general"
+                className={`flex items-start space-x-3 border rounded-xl p-4 transition-all duration-200 cursor-pointer ${
+                  enhancementType === "general"
+                    ? "border-violet-500 bg-violet-500/5 shadow-[0_0_15px_rgba(139,92,246,0.1)]"
+                    : "border-slate-800 bg-slate-900/40 hover:bg-slate-900/80 hover:border-slate-700"
+                }`}
+              >
+                <RadioGroupItem value="general" id="studio-type-general" className="border-slate-500 text-violet-500 mt-0.5" />
+                <div className="flex-1">
+                  <div className="font-bold text-slate-200 text-base">General Upscale / Denoiser</div>
+                  <p className="text-sm text-slate-500 mt-1">Best for landscapes, anime, and general photography.</p>
+                </div>
+              </label>
+
+              <label
+                htmlFor="studio-type-face"
+                className={`flex items-start space-x-3 border rounded-xl p-4 transition-all duration-200 cursor-pointer ${
+                  enhancementType === "face"
+                    ? "border-violet-500 bg-violet-500/5 shadow-[0_0_15px_rgba(139,92,246,0.1)]"
+                    : "border-slate-800 bg-slate-900/40 hover:bg-slate-900/80 hover:border-slate-700"
+                }`}
+              >
+                <RadioGroupItem value="face" id="studio-type-face" className="border-slate-500 text-violet-500 mt-0.5" />
+                <div className="flex-1">
+                  <div className="font-bold text-slate-200 text-base">Face / Portrait Restoration</div>
+                  <p className="text-sm text-slate-500 mt-1">Specialized models to recover facial details and eyes.</p>
+                </div>
+              </label>
+            </RadioGroup>
+          </div>
+        </div>
+      </CardContent>
+
+      <CardFooter className="bg-slate-900/60 p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-center border-t border-slate-800/50 gap-6">
+        <div className="text-center sm:text-left">
+          <div className="text-sm text-slate-400 font-medium">Total Cost</div>
+          <div className="font-extrabold text-white text-3xl">
+            {isLoadingPricing ? (
+              <Loader2 className="h-6 w-6 animate-spin inline-block mt-1" />
+            ) : (
+              activePricing.formattedPrice
+            )}
+          </div>
+        </div>
+        <Button
+          onClick={handleUploadAndCheckout}
+          disabled={!file || isUploading || isLoadingPricing}
+          className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-500 text-white h-14 px-8 text-lg font-semibold rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+        >
+          {isUploading ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Processing…
+            </>
+          ) : (
+            <>
+              <CreditCard className="h-5 w-5" />
+              Proceed to Checkout
+            </>
+          )}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}

@@ -1,20 +1,20 @@
 import { headers } from "next/headers";
 import { Suspense } from "react";
-import { ImageUploader } from "@/components/dashboard/image-uploader";
+import { StudioImageUploader } from "@/components/studio/ImageUploader";
 import { Sparkles } from "lucide-react";
 
 export default function StudioPage({
   searchParams,
 }: {
-  searchParams: { tier?: string }
+  searchParams: { tier?: string };
 }) {
   const headersList = headers();
-  const countryCode = headersList.get('x-user-country') || 'US';
-  const initialTier = searchParams.tier || '4k';
+  const countryCode = headersList.get("x-user-country") || "US";
+  const initialTier = searchParams.tier || "4k";
 
   return (
     <div className="min-h-screen bg-[#090A0F] text-slate-50 font-sans p-4 sm:p-8 relative overflow-hidden">
-      {/* Background Gradients */}
+      {/* Background */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-cyan-900/10 blur-[120px]" />
         <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-violet-900/10 blur-[120px]" />
@@ -31,12 +31,22 @@ export default function StudioPage({
             Create Your Masterpiece
           </h1>
           <p className="text-lg text-slate-400">
-            Upload your image below. Our AI will enhance the details and scale it to your desired resolution.
+            Upload your image below. Our AI will enhance the details and scale
+            it to your desired resolution.
           </p>
         </div>
 
-        <Suspense fallback={<div className="p-12 text-center text-slate-400">Loading uploader...</div>}>
-          <ImageUploader countryCode={countryCode} initialTier={initialTier} />
+        <Suspense
+          fallback={
+            <div className="p-12 text-center text-slate-400">
+              Loading uploader…
+            </div>
+          }
+        >
+          <StudioImageUploader
+            countryCode={countryCode}
+            initialTier={initialTier}
+          />
         </Suspense>
       </div>
     </div>
