@@ -129,3 +129,35 @@ export async function finalizeOrder(orderId: string, filePath: string) {
   revalidatePath('/admin')
   return { success: true }
 }
+
+export async function generateThumbnailUrl(filePath: string) {
+  if (!(await isAdmin())) {
+    throw new Error("Unauthorized")
+  }
+
+  const adminClient = createAdminClient()
+
+  const { data, error } = await adminClient.storage
+    .from('raw-uploads')
+    .createSignedUrl(filePath, 120, {
+      transform: {
+        width: 80,
+        height: 80,
+        resize: 'cover',
+      },
+    })
+
+  if (error) {
+    // Fallback to full-size signed URL if transforms not available
+    const { data: fallback, error: fallbackErr } = await adminClient.storage
+      .from('raw-uploads')
+      .createSignedUrl(filePath, 120)
+
+    if (fallbackErr) {
+      throw new Error(`Failed to generate thumbnail: ${fallbackErr.message}`)
+    }
+    return fallback.signedUrl
+  }
+
+  return data.signedUrl
+}

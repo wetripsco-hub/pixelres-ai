@@ -1,18 +1,22 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { generateDownloadUrl, updateOrderStatus, generateUploadUrl, finalizeOrder } from "./actions";
-import { Shield, Download, Upload, CheckCircle2, Loader2, AlertCircle, Settings, FileImage } from "lucide-react";
+import { generateDownloadUrl, updateOrderStatus, generateUploadUrl, finalizeOrder, generateThumbnailUrl } from "./actions";
+import { Shield, Download, Upload, CheckCircle2, Loader2, AlertCircle, Settings, FileImage, User, Image as ImageIcon, Save, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 
 interface Order {
   id: string;
   user_id: string | null;
+  guest_email: string | null;
   original_image_url: string;
   upscaled_image_url: string | null;
   target_resolution: string;
@@ -31,17 +35,55 @@ interface Metrics {
   estimatedTotalUsd: number;
   pendingJobs: number;
   completedJobs: number;
+  totalOrders: number;
 }
 
-export function AdminDashboardClient({ initialOrders, metrics }: { initialOrders: Order[], metrics: Metrics }) {
+interface PricingRow {
+  id: string;
+  usd_price: number;
+  pkr_price: number;
+  inr_price: number;
+}
+
+export function AdminDashboardClient({ 
+  initialOrders, 
+  metrics,
+  initialPricing 
+}: { 
+  initialOrders: Order[], 
+  metrics: Metrics,
+  initialPricing: PricingRow[]
+}) {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [isProcessingId, setIsProcessingId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<string>("orders");
+  const [orderFilter, setOrderFilter] = useState<string>("all");
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadingForOrderId, setUploadingForOrderId] = useState<string | null>(null);
+  // Pricing State
+  const [pricing, setPricing] = useState<PricingRow[]>(initialPricing);
+  const [isSavingPricing, setIsSavingPricing] = useState(false);
+  const [pricingMessage, setPricingMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
-  const filteredOrders = orders.filter(o => activeTab === 'all' || o.status === activeTab);
+  // Upload Modal State
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadOrder, setUploadOrder] = useState<Order | null>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Thumbnails Cache
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
+
+  const filteredOrders = orders.filter(o => orderFilter === 'all' || o.status === orderFilter);
+
+  const loadThumbnail = async (orderId: string, filePath: string) => {
+    if (thumbnails[orderId]) return; // already loaded
+    try {
+      const url = await generateThumbnailUrl(filePath);
+      setThumbnails(prev => ({ ...prev, [orderId]: url }));
+    } catch (err) {
+      console.error("Failed to load thumbnail", err);
+    }
+  };
 
   const handleDownloadOriginal = async (orderId: string, filePath: string) => {
     try {
@@ -67,34 +109,28 @@ export function AdminDashboardClient({ initialOrders, metrics }: { initialOrders
     }
   };
 
-  const triggerUpload = (orderId: string) => {
-    setUploadingForOrderId(orderId);
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
+  const openUploadModal = (order: Order) => {
+    setUploadOrder(order);
+    setUploadFile(null);
+    setUploadModalOpen(true);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    const orderId = uploadingForOrderId;
-
-    if (!file || !orderId) return;
-
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return;
+  const handleModalUpload = async () => {
+    if (!uploadFile || !uploadOrder) return;
 
     try {
-      setIsProcessingId(orderId);
-      const fileExt = file.name.split('.').pop() || 'jpg';
+      setIsUploading(true);
+      const fileExt = uploadFile.name.split('.').pop() || 'jpg';
+      const orderId = uploadOrder.id;
 
       // 1. Get signed upload URL
-      const { signedUrl, token, filePath } = await generateUploadUrl(orderId, order.user_id || 'guest', fileExt);
+      const { signedUrl, token, filePath } = await generateUploadUrl(orderId, uploadOrder.user_id || 'guest', fileExt);
 
       // 2. Upload file directly to Supabase using the signed URL
       const supabase = createClient();
       const { error: uploadError } = await supabase.storage
         .from('upscaled-outputs')
-        .uploadToSignedUrl(filePath, token, file);
+        .uploadToSignedUrl(filePath, token, uploadFile);
 
       if (uploadError) throw new Error(uploadError.message);
 
@@ -108,15 +144,42 @@ export function AdminDashboardClient({ initialOrders, metrics }: { initialOrders
         completed_at: new Date().toISOString()
       } : o));
 
+      setUploadModalOpen(false);
       alert("Deliverable uploaded and order completed successfully.");
 
     } catch (error: any) {
       alert(`Upload failed: ${error.message}`);
     } finally {
-      setIsProcessingId(null);
-      setUploadingForOrderId(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setIsUploading(false);
     }
+  };
+
+  const handleSavePricing = async () => {
+    setIsSavingPricing(true);
+    setPricingMessage(null);
+    try {
+      const res = await fetch('/api/admin/pricing', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tiers: pricing })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save pricing');
+      }
+      setPricingMessage({ type: 'success', text: 'Pricing settings saved successfully.' });
+      setTimeout(() => setPricingMessage(null), 3000);
+    } catch (err: any) {
+      setPricingMessage({ type: 'error', text: err.message });
+    } finally {
+      setIsSavingPricing(false);
+    }
+  };
+
+  const updatePricingRow = (id: string, field: 'usd_price' | 'pkr_price' | 'inr_price', value: string) => {
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return;
+    setPricing(pricing.map(row => row.id === id ? { ...row, [field]: numValue } : row));
   };
 
   const getStatusBadge = (status: string) => {
@@ -128,24 +191,22 @@ export function AdminDashboardClient({ initialOrders, metrics }: { initialOrders
     }
   };
 
+  const getResolutionBadge = (res: string) => {
+    if (res === 'web') return <Badge variant="outline" className="text-slate-300 border-slate-600 bg-slate-800/50">WEB</Badge>;
+    if (res === '4k') return <Badge variant="outline" className="text-cyan-300 border-cyan-600 bg-cyan-900/30">4K</Badge>;
+    if (res === '8k') return <Badge variant="outline" className="text-violet-300 border-violet-600 bg-violet-900/30">8K</Badge>;
+    return <Badge variant="outline">{res}</Badge>;
+  };
+
   return (
     <div className="space-y-8">
-      {/* Hidden file input for uploading deliverables */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        className="hidden"
-        accept="image/jpeg, image/png, image/webp"
-      />
-
       {/* Metrics Bar */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-slate-900 border-slate-800">
           <CardContent className="p-6">
-            <div className="text-sm font-medium text-slate-400 mb-1">Estimated Total Revenue</div>
+            <div className="text-sm font-medium text-slate-400 mb-1">Total Revenue</div>
             <div className="text-2xl font-bold text-emerald-400">${metrics.estimatedTotalUsd.toFixed(2)} USD</div>
-            <div className="text-xs text-slate-500 mt-2 flex gap-2">
+            <div className="text-xs text-slate-500 mt-2 flex flex-col gap-0.5">
                <span>USD: ${metrics.totalUsdRevenue.toFixed(2)}</span>
                <span>PKR: Rs.{metrics.totalPkrRevenue.toLocaleString()}</span>
                <span>INR: ₹{metrics.totalInrRevenue.toLocaleString()}</span>
@@ -155,7 +216,7 @@ export function AdminDashboardClient({ initialOrders, metrics }: { initialOrders
 
         <Card className="bg-slate-900 border-slate-800">
           <CardContent className="p-6">
-            <div className="text-sm font-medium text-slate-400 mb-1">Pending Jobs</div>
+            <div className="text-sm font-medium text-slate-400 mb-1">Pending Orders</div>
             <div className="text-2xl font-bold text-amber-400">{metrics.pendingJobs}</div>
             <div className="text-xs text-slate-500 mt-2">Awaiting AI processing</div>
           </CardContent>
@@ -163,142 +224,315 @@ export function AdminDashboardClient({ initialOrders, metrics }: { initialOrders
 
         <Card className="bg-slate-900 border-slate-800">
           <CardContent className="p-6">
-            <div className="text-sm font-medium text-slate-400 mb-1">Completed Deliveries</div>
+            <div className="text-sm font-medium text-slate-400 mb-1">Completed Deliverables</div>
             <div className="text-2xl font-bold text-cyan-400">{metrics.completedJobs}</div>
             <div className="text-xs text-slate-500 mt-2">Successfully upscaled</div>
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900 border-slate-800 flex items-center justify-center">
+        <Card className="bg-slate-900 border-slate-800">
            <CardContent className="p-6 text-center">
-             <Shield className="h-8 w-8 text-violet-500 mx-auto mb-2" />
-             <div className="text-sm font-medium text-slate-300">Admin Session Active</div>
+             <div className="text-sm font-medium text-slate-400 mb-1">Total Orders</div>
+             <div className="text-2xl font-bold text-violet-400">{metrics.totalOrders}</div>
+             <div className="text-xs text-slate-500 mt-2 flex items-center justify-center gap-1"><Shield className="h-3 w-3" /> Admin Active</div>
            </CardContent>
         </Card>
       </div>
 
-      {/* Orders Table */}
-      <Card className="bg-slate-900 border-slate-800">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <CardTitle>Order Management</CardTitle>
-              <CardDescription>Fulfill enhancement requests and manage order status.</CardDescription>
-            </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="bg-slate-950 border border-slate-800 mb-4">
+          <TabsTrigger value="orders">Orders Management</TabsTrigger>
+          <TabsTrigger value="pricing">Pricing Configuration</TabsTrigger>
+        </TabsList>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
-              <TabsList className="bg-slate-950 border border-slate-800">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="pending">Pending</TabsTrigger>
-                <TabsTrigger value="processing">Processing</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left text-slate-300">
-              <thead className="text-xs text-slate-400 uppercase bg-slate-950/50 border-b border-slate-800">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Order Details</th>
-                  <th className="px-4 py-3 font-medium">Resolution / Type</th>
-                  <th className="px-4 py-3 font-medium">Revenue</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="text-center py-8 text-slate-500">No orders found.</td>
-                  </tr>
-                ) : (
-                  filteredOrders.map((order) => {
-                    const isBusy = isProcessingId === order.id;
-                    return (
-                      <tr key={order.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="font-mono text-xs text-slate-200">{order.id.substring(0, 8)}...</div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">
-                            {formatDistanceToNow(new Date(order.created_at), { addSuffix: true })}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-cyan-400 uppercase text-xs">{order.target_resolution}</div>
-                          <div className="text-[11px] text-slate-400 capitalize">{order.enhancement_type}</div>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs">
-                          {order.currency === 'USD' && '$'}{order.currency === 'INR' && '₹'}{order.currency === 'PKR' && 'Rs. '}
-                          {order.amount_paid} {order.currency}
-                        </td>
-                        <td className="px-4 py-3">
-                          {getStatusBadge(order.status)}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {/* Download Original */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-2 bg-slate-900 border-slate-700 text-slate-300 hover:text-white"
-                              onClick={() => handleDownloadOriginal(order.id, order.original_image_url)}
-                              disabled={isBusy}
-                              title="Download Original"
-                            >
-                              {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                            </Button>
+        <TabsContent value="orders" className="space-y-4">
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader className="pb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <CardTitle>Order Management</CardTitle>
+                  <CardDescription>Fulfill enhancement requests and manage order status.</CardDescription>
+                </div>
 
-                            {/* Mark Processing */}
-                            {order.status === 'pending' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 px-2 bg-slate-900 border-slate-700 text-cyan-400 hover:text-cyan-300"
-                                onClick={() => handleStatusChange(order.id, 'processing')}
-                                disabled={isBusy}
-                                title="Mark as Processing"
-                              >
-                                <Settings className="h-4 w-4" />
-                              </Button>
-                            )}
-
-                            {/* Upload Deliverable */}
-                            {(order.status === 'pending' || order.status === 'processing') && (
-                              <Button
-                                size="sm"
-                                className="h-8 px-3 bg-cyan-600 hover:bg-cyan-500 text-white"
-                                onClick={() => triggerUpload(order.id)}
-                                disabled={isBusy}
-                              >
-                                <Upload className="h-4 w-4 mr-1.5" /> Upload Output
-                              </Button>
-                            )}
-
-                            {/* Re-upload if completed */}
-                            {order.status === 'completed' && (
-                               <Button
-                               size="sm"
-                               variant="ghost"
-                               className="h-8 px-2 text-slate-500 hover:text-cyan-400"
-                               onClick={() => triggerUpload(order.id)}
-                               disabled={isBusy}
-                               title="Re-upload Deliverable"
-                             >
-                               <FileImage className="h-4 w-4" />
-                             </Button>
-                            )}
-                          </div>
-                        </td>
+                <div className="flex gap-2">
+                  {['all', 'pending', 'processing', 'completed'].map(f => (
+                    <Button 
+                      key={f} 
+                      variant={orderFilter === f ? 'default' : 'outline'} 
+                      size="sm"
+                      onClick={() => setOrderFilter(f)}
+                      className={orderFilter === f ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400'}
+                    >
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto rounded-md border border-slate-800">
+                <table className="w-full text-sm text-left text-slate-300">
+                  <thead className="text-xs text-slate-400 uppercase bg-slate-950/80 border-b border-slate-800">
+                    <tr>
+                      <th className="px-4 py-4 font-medium">Order Details</th>
+                      <th className="px-4 py-4 font-medium">Customer</th>
+                      <th className="px-4 py-4 font-medium">Original Image</th>
+                      <th className="px-4 py-4 font-medium">Resolution</th>
+                      <th className="px-4 py-4 font-medium">Status</th>
+                      <th className="px-4 py-4 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-12 text-slate-500">No orders found.</td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                    ) : (
+                      filteredOrders.map((order) => {
+                        const isBusy = isProcessingId === order.id;
+                        return (
+                          <tr key={order.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="font-mono text-xs text-slate-200">{order.id.substring(0, 8)}</div>
+                              <div className="text-[11px] text-slate-500 mt-1">
+                                {formatDistanceToNow(new Date(order.created_at), { addSuffix: true })}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2 text-slate-300 text-xs">
+                                <User className="h-3 w-3 text-slate-500" />
+                                {order.guest_email || order.user_id?.substring(0, 8) || 'Guest'}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div 
+                                  className="h-10 w-10 bg-slate-800 rounded flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all group"
+                                  onClick={() => loadThumbnail(order.id, order.original_image_url)}
+                                  title="Load Thumbnail"
+                                >
+                                  {thumbnails[order.id] ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={thumbnails[order.id]} alt="thumb" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <ImageIcon className="h-4 w-4 text-slate-500 group-hover:text-slate-300" />
+                                  )}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 px-2 text-slate-400 hover:text-white hover:bg-slate-800"
+                                  onClick={() => handleDownloadOriginal(order.id, order.original_image_url)}
+                                  disabled={isBusy}
+                                  title="Download Original"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              {getResolutionBadge(order.target_resolution)}
+                            </td>
+                            <td className="px-4 py-3">
+                              {getStatusBadge(order.status)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {/* Mark Processing */}
+                                {order.status === 'pending' && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-2 bg-slate-900 border-slate-700 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/30"
+                                    onClick={() => handleStatusChange(order.id, 'processing')}
+                                    disabled={isBusy}
+                                    title="Mark as Processing"
+                                  >
+                                    <Settings className="h-4 w-4" />
+                                  </Button>
+                                )}
+
+                                {/* Upload Deliverable Modal Trigger */}
+                                {(order.status === 'pending' || order.status === 'processing') && (
+                                  <Button
+                                    size="sm"
+                                    className="h-8 px-3 bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white shadow-lg"
+                                    onClick={() => openUploadModal(order)}
+                                    disabled={isBusy}
+                                  >
+                                    <Upload className="h-4 w-4 mr-1.5" /> Upload Output
+                                  </Button>
+                                )}
+
+                                {/* Re-upload if completed */}
+                                {order.status === 'completed' && (
+                                   <Button
+                                   size="sm"
+                                   variant="ghost"
+                                   className="h-8 px-2 text-slate-500 hover:text-violet-400 hover:bg-slate-800"
+                                   onClick={() => openUploadModal(order)}
+                                   disabled={isBusy}
+                                   title="Re-upload Deliverable"
+                                 >
+                                   <FileImage className="h-4 w-4" />
+                                 </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pricing" className="space-y-4">
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader>
+              <CardTitle>Multi-Currency Pricing</CardTitle>
+              <CardDescription>Configure the base prices for each resolution tier across all supported currencies. Changes will reflect immediately on the frontend.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-6">
+                <div className="rounded-md border border-slate-800 overflow-hidden">
+                  <table className="w-full text-sm text-left text-slate-300">
+                    <thead className="text-xs text-slate-400 uppercase bg-slate-950/80 border-b border-slate-800">
+                      <tr>
+                        <th className="px-6 py-4 font-medium">Resolution Tier</th>
+                        <th className="px-6 py-4 font-medium">USD ($)</th>
+                        <th className="px-6 py-4 font-medium">PKR (Rs.)</th>
+                        <th className="px-6 py-4 font-medium">INR (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {['web', '4k', '8k'].map((tierId) => {
+                        const row = pricing.find(p => p.id === tierId);
+                        if (!row) return null;
+                        return (
+                          <tr key={tierId} className="border-b border-slate-800/50 bg-slate-900/20">
+                            <td className="px-6 py-4 font-medium text-slate-200 uppercase">{tierId}</td>
+                            <td className="px-6 py-4">
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                                <Input 
+                                  type="number" 
+                                  step="0.01" 
+                                  value={row.usd_price} 
+                                  onChange={(e) => updatePricingRow(tierId, 'usd_price', e.target.value)}
+                                  className="pl-7 bg-slate-950 border-slate-700 h-9"
+                                />
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">Rs.</span>
+                                <Input 
+                                  type="number" 
+                                  step="1" 
+                                  value={row.pkr_price} 
+                                  onChange={(e) => updatePricingRow(tierId, 'pkr_price', e.target.value)}
+                                  className="pl-8 bg-slate-950 border-slate-700 h-9"
+                                />
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">₹</span>
+                                <Input 
+                                  type="number" 
+                                  step="1" 
+                                  value={row.inr_price} 
+                                  onChange={(e) => updatePricingRow(tierId, 'inr_price', e.target.value)}
+                                  className="pl-7 bg-slate-950 border-slate-700 h-9"
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex items-center justify-between mt-4">
+                  <div>
+                    {pricingMessage && (
+                      <div className={`flex items-center gap-2 text-sm ${pricingMessage.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {pricingMessage.type === 'success' ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                        {pricingMessage.text}
+                      </div>
+                    )}
+                  </div>
+                  <Button 
+                    onClick={handleSavePricing} 
+                    disabled={isSavingPricing}
+                    className="bg-violet-600 hover:bg-violet-500 text-white min-w-[120px]"
+                  >
+                    {isSavingPricing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                    Save Pricing
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Upload Modal */}
+      <Dialog open={uploadModalOpen} onOpenChange={setUploadModalOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Upload Upscaled Deliverable</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Select the finished 8K/4K file to upload and complete this order.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {uploadOrder && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4 text-sm bg-slate-950 p-4 rounded-lg border border-slate-800">
+                <div>
+                  <span className="text-slate-500 block mb-1">Order ID</span>
+                  <span className="font-mono text-slate-300">{uploadOrder.id.substring(0, 8)}...</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block mb-1">Target Res</span>
+                  {getResolutionBadge(uploadOrder.target_resolution)}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="file-upload">Select Image File</Label>
+                <Input 
+                  id="file-upload" 
+                  type="file" 
+                  accept="image/jpeg, image/png, image/webp"
+                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                  className="bg-slate-950 border-slate-700 text-slate-300 cursor-pointer"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadModalOpen(false)} disabled={isUploading} className="border-slate-700 text-slate-300 hover:bg-slate-800">
+              Cancel
+            </Button>
+            <Button onClick={handleModalUpload} disabled={!uploadFile || isUploading} className="bg-cyan-600 hover:bg-cyan-500 text-white">
+              {isUploading ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Uploading...</>
+              ) : (
+                <><Upload className="h-4 w-4 mr-2" /> Complete Order</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
