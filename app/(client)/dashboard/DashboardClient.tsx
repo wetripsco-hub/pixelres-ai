@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ImageUploader } from "@/components/dashboard/image-uploader";
-import { History, Download, Shield, LogOut, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon, PartyPopper } from "lucide-react";
+import { History, Download, Shield, LogOut, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon, PartyPopper, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,15 +32,18 @@ interface DashboardClientProps {
 export function DashboardClient({ countryCode, initialOrders, user }: DashboardClientProps) {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialTier = searchParams.get('tier') || '4k';
   const supabase = createClient();
 
-  // Payment success celebration
+  // Payment success celebration & auto-claim
   useEffect(() => {
     const payment = searchParams.get('payment');
+    const orderId = searchParams.get('order_id');
+
     if (payment === 'success') {
       confetti({
         particleCount: 150,
@@ -48,16 +51,19 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
         origin: { y: 0.6 },
         colors: ['#22d3ee', '#8b5cf6', '#ffffff']
       });
-      // Clean URL
-      router.replace('/dashboard', undefined);
     }
-  }, [searchParams, router]);
+
+    if (payment === 'success' || orderId) {
+      // Auto-claim order and refresh orders list via API
+      fetchFreshOrders(orderId || undefined);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     setOrders(initialOrders);
   }, [initialOrders]);
 
-  // Real-time order updates
+  // Real-time order updates on public:orders
   useEffect(() => {
     const channel = supabase
       .channel('dashboard-orders')
@@ -84,6 +90,25 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
       supabase.removeChannel(channel);
     };
   }, [supabase]);
+
+  const fetchFreshOrders = async (orderId?: string) => {
+    setIsRefreshing(true);
+    try {
+      const res = await fetch('/api/orders/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId }),
+      });
+      const data = await res.json();
+      if (data.orders) {
+        setOrders(data.orders);
+      }
+    } catch (err) {
+      console.error("Failed to fetch fresh orders:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -203,9 +228,21 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
                 <span className="flex items-center gap-2">
                   <History className="h-5 w-5 text-cyan-400" /> Recent Enhancements
                 </span>
-                <Badge variant="outline" className="text-xs border-slate-700 text-slate-400">
-                  {orders.length} Orders
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => fetchFreshOrders()}
+                    disabled={isRefreshing}
+                    className="h-8 px-2 text-slate-400 hover:text-white hover:bg-slate-800"
+                    title="Refresh Orders"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
+                  </Button>
+                  <Badge variant="outline" className="text-xs border-slate-700 text-slate-400">
+                    {orders.length} Orders
+                  </Badge>
+                </div>
               </CardTitle>
               <CardDescription className="text-slate-400">
                 Track status and download your upscaled high-resolution renders.
@@ -215,8 +252,18 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
             <CardContent className="flex-1 space-y-4 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
               {orders.length === 0 ? (
                 <div className="text-center py-12 px-4 border border-slate-800 border-dashed rounded-xl bg-slate-950/30">
-                  <p className="text-slate-400 text-sm">No enhancement orders yet.</p>
-                  <p className="text-slate-500 text-xs mt-1">Upload an image to get started.</p>
+                  <p className="text-slate-400 text-sm font-medium">No enhancement orders yet.</p>
+                  <p className="text-slate-500 text-xs mt-1">Upload an image on the left to start upscaling.</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => fetchFreshOrders()}
+                    disabled={isRefreshing}
+                    className="mt-4 border-slate-700 text-slate-300 hover:bg-slate-800"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 mr-2 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
+                    Refresh Orders
+                  </Button>
                 </div>
               ) : (
                 orders.map((order) => (

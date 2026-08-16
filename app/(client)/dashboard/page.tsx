@@ -21,7 +21,7 @@ export default async function DashboardPage({
   const userId = session.user.id;
   const userEmail = session.user.email;
 
-  // If returning from checkout with order_id, automatically link guest order to this user
+  // 1. Auto-link guest order on payment success / returning with order_id
   if (searchParams?.order_id) {
     await adminClient
       .from("orders")
@@ -30,7 +30,7 @@ export default async function DashboardPage({
       .is("user_id", null);
   }
 
-  // Also link any unlinked guest orders (matching this user's email or with empty email)
+  // 2. Auto-link any unlinked guest orders matching user's email or with empty email
   if (userEmail) {
     await adminClient
       .from("orders")
@@ -39,7 +39,7 @@ export default async function DashboardPage({
       .is("user_id", null);
   }
 
-  // Fetch all orders belonging to this user or email using Admin Client (bypasses RLS filtering)
+  // 3. Fetch ALL orders (pending, processing, completed, failed) for user or email
   let orderQuery = adminClient
     .from("orders")
     .select("*")
