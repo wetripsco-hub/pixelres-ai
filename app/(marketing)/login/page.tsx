@@ -1,86 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Sparkles, Loader2, Mail, Lock, ArrowRight, Chrome } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { createClient } from '@/lib/supabase/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Sparkles } from 'lucide-react';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const supabase = createClient();
-  const router = useRouter();
-
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "";
-
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-
-    try {
-      if (isLogin) {
-        // Sign In
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (signInError) throw signInError;
-
-        router.refresh();
-        router.push("/dashboard");
-      } else {
-        // Sign Up
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${siteUrl}/api/auth/callback`,
-          },
-        });
-
-        if (signUpError) throw signUpError;
-
-        // If Supabase confirms the user immediately (auto-confirm enabled)
-        if (data.session) {
-          router.refresh();
-          router.push("/dashboard");
-        } else {
-          setSuccessMessage("Check your email for a confirmation link to complete sign up.");
-        }
-      }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setError(null);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${siteUrl}/api/auth/callback`,
-      },
-    });
-
-    if (error) {
-      setError(error.message);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#090A0F] text-slate-50 font-sans flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -107,115 +35,65 @@ export default function LoginPage() {
 
         <Card className="bg-slate-900/40 border-slate-800/80 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden">
           <CardHeader className="text-center pb-2">
-            <CardTitle className="text-2xl font-bold text-slate-100">
-              {isLogin ? "Welcome Back" : "Create Account"}
-            </CardTitle>
+            <CardTitle className="text-2xl font-bold text-slate-100">Welcome Back</CardTitle>
             <CardDescription className="text-slate-400">
-              {isLogin ? "Sign in to access your dashboard" : "Sign up to start upscaling your images"}
+              Sign in or create an account to start upscaling
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-6 sm:p-8 space-y-6">
-            {/* Google OAuth Button */}
-            <Button
-              type="button"
-              onClick={handleGoogleSignIn}
-              className="w-full h-12 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 hover:border-slate-600 rounded-xl font-medium transition-all flex items-center justify-center gap-3"
-            >
-              <Chrome className="h-5 w-5" />
-              Continue with Google
-            </Button>
-
-            {/* Divider */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-700"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-slate-900/40 text-slate-500">or continue with email</span>
-              </div>
-            </div>
-
-            {/* Email/Password Form */}
-            <form onSubmit={handleEmailAuth} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-300 font-medium">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="pl-10 h-12 bg-slate-950 border-slate-700 focus:border-cyan-500 text-white rounded-xl placeholder:text-slate-500"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-slate-300 font-medium">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    className="pl-10 h-12 bg-slate-950 border-slate-700 focus:border-cyan-500 text-white rounded-xl placeholder:text-slate-500"
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
-                  {error}
-                </div>
-              )}
-
-              {successMessage && (
-                <div className="text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 text-center">
-                  {successMessage}
-                </div>
-              )}
-
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full h-12 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-semibold shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] transition-all flex items-center justify-center gap-2"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <>
-                    {isLogin ? "Sign In" : "Create Account"}
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            </form>
-
-            {/* Toggle Login/Signup */}
-            <div className="text-center text-sm text-slate-400">
-              {isLogin ? (
-                <p>
-                  Don&apos;t have an account?{" "}
-                  <button onClick={() => { setIsLogin(false); setError(null); setSuccessMessage(null); }} className="text-cyan-400 hover:text-cyan-300 font-medium transition-colors">
-                    Sign up
-                  </button>
-                </p>
-              ) : (
-                <p>
-                  Already have an account?{" "}
-                  <button onClick={() => { setIsLogin(true); setError(null); setSuccessMessage(null); }} className="text-cyan-400 hover:text-cyan-300 font-medium transition-colors">
-                    Sign in
-                  </button>
-                </p>
-              )}
-            </div>
+          <CardContent className="p-6 sm:p-8">
+            <Auth
+              supabaseClient={supabase}
+              appearance={{
+                theme: ThemeSupa,
+                variables: {
+                  default: {
+                    colors: {
+                      brand: '#06b6d4', // cyan-500
+                      brandAccent: '#0891b2', // cyan-600
+                      brandButtonText: 'white',
+                      defaultButtonBackground: '#1e293b', // slate-800
+                      defaultButtonBackgroundHover: '#334155', // slate-700
+                      defaultButtonBorder: '#334155', // slate-700
+                      defaultButtonText: 'white',
+                      dividerBackground: '#334155', // slate-700
+                      inputBackground: '#0f172a', // slate-900
+                      inputBorder: '#334155', // slate-700
+                      inputBorderHover: '#06b6d4', // cyan-500
+                      inputBorderFocus: '#06b6d4', // cyan-500
+                      inputText: 'white',
+                      inputPlaceholder: '#94a3b8', // slate-400
+                      messageText: '#ef4444', // red-500
+                      messageTextDanger: '#ef4444', // red-500
+                      anchorTextColor: '#06b6d4', // cyan-500
+                      anchorTextHoverColor: '#67e8f9', // cyan-300
+                    },
+                    space: {
+                      buttonPadding: '12px 16px',
+                      inputPadding: '12px 16px',
+                    },
+                    radii: {
+                      borderRadiusButton: '0.5rem',
+                      buttonBorderRadius: '0.5rem',
+                      inputBorderRadius: '0.5rem',
+                    },
+                  },
+                },
+                className: {
+                  container: 'w-full',
+                  button: 'w-full font-medium transition-all shadow-md',
+                  input: 'transition-colors',
+                  label: 'text-slate-300 font-medium mb-1.5',
+                  loader: 'animate-spin',
+                  message: 'text-sm text-center mt-4 p-3 rounded-md bg-slate-800/50 border border-slate-700',
+                  anchor: 'text-sm font-medium transition-colors hover:underline',
+                  divider: 'my-6',
+                },
+              }}
+              theme="dark"
+              providers={['google']}
+              redirectTo={`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`}
+              onlyThirdPartyProviders={false}
+            />
           </CardContent>
         </Card>
       </div>

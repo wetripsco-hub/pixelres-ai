@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { getAllPricingTiersDynamic, getAllPricingTiers, ResolutionTier, PricingInfo } from "@/lib/pricing";
+import { getAllPricingTiers, ResolutionTier, PricingInfo } from "@/lib/pricing";
 import { motion, AnimatePresence } from "framer-motion";
+
+
 
 export interface ImageUploaderProps {
   countryCode?: string;
@@ -31,26 +33,16 @@ export function ImageUploader({
   const [error, setError] = useState<string | null>(null);
   const [selectedTier, setSelectedTier] = useState<string>(initialTier);
   const [enhancementType, setEnhancementType] = useState<string>("general");
-  
-  const [pricingTiers, setPricingTiers] = useState<PricingInfo[]>(getAllPricingTiers(countryCode));
-  const [isLoadingPricing, setIsLoadingPricing] = useState(true);
 
+  const pricingTiers = getAllPricingTiers(countryCode);
   const activePricing = pricingTiers.find((t) => t.tier === selectedTier) || pricingTiers[1];
   const supabase = createClient();
 
   useEffect(() => {
-    let isMounted = true;
-    getAllPricingTiersDynamic(countryCode).then(tiers => {
-      if (isMounted) {
-        setPricingTiers(tiers);
-        setIsLoadingPricing(false);
-        if (initialTier && tiers.some(t => t.tier === initialTier)) {
-          setSelectedTier(initialTier);
-        }
-      }
-    });
-    return () => { isMounted = false };
-  }, [countryCode, initialTier]);
+    if (initialTier && pricingTiers.some(t => t.tier === initialTier)) {
+      setSelectedTier(initialTier);
+    }
+  }, [initialTier, pricingTiers]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setError(null);
@@ -65,7 +57,7 @@ export function ImageUploader({
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       "image/jpeg": [".jpeg", ".jpg"],
@@ -73,9 +65,7 @@ export function ImageUploader({
       "image/webp": [".webp"],
     },
     maxFiles: 1,
-    disabled: isUploading || isLoadingPricing,
-    noClick: false,
-    noKeyboard: false,
+    disabled: isUploading,
   });
 
   const handleClear = (e: React.MouseEvent) => {
@@ -100,9 +90,7 @@ export function ImageUploader({
       const fileExt = file.name.split('.').pop();
       const filePath = `${userId}/${orderId}.${fileExt}`;
 
-      setUploadProgress(30);
-
-      // Upload file to Supabase Storage
+      setUploadProgress(40);
       const { error: uploadError } = await supabase.storage
         .from('raw-uploads')
         .upload(filePath, file, {
@@ -112,21 +100,23 @@ export function ImageUploader({
 
       if (uploadError) throw new Error(uploadError.message);
 
-      setUploadProgress(60);
+      setUploadProgress(80);
 
-      // Create order via server-side API route (bypasses RLS)
-      const orderResponse = await fetch('/api/orders/create', {
+
+
+      // 1. Create the order record securely on the server
+      const orderResponse = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orderId,
-          userId: user?.id || null,
-          filePath,
-          targetResolution: selectedTier,
-          enhancementType,
+          id: orderId,
+          user_id: user?.id || null,
+          customer_email: user?.email || null,
+          original_image_url: filePath,
+          target_resolution: selectedTier,
+          enhancement_type: enhancementType,
           currency: activePricing.currency,
-          amountPaid: activePricing.price,
-
+          amount_paid: activePricing.price,
         })
       });
 
@@ -135,9 +125,9 @@ export function ImageUploader({
         throw new Error(orderData.error || 'Failed to create order');
       }
 
-      setUploadProgress(80);
+      setUploadProgress(100);
 
-      // Create Stripe checkout session
+      // 2. Init Stripe Checkout
       const checkoutResponse = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -158,7 +148,6 @@ export function ImageUploader({
         throw new Error(checkoutData.error || 'Failed to initialize checkout');
       }
 
-      setUploadProgress(100);
       window.location.href = checkoutData.url;
 
     } catch (err: any) {
@@ -184,25 +173,14 @@ export function ImageUploader({
       </CardHeader>
 
       <CardContent className="p-6 sm:p-8 space-y-8">
-        {/* Full clickable dropzone */}
         <div
           {...getRootProps()}
           className={`border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center transition-all duration-300 cursor-pointer relative overflow-hidden group ${
             isDragActive ? "border-cyan-500 bg-cyan-950/20 shadow-[inset_0_0_50px_rgba(6,182,212,0.1)]" :
             file ? "border-slate-700 bg-slate-900/50" : "border-slate-700 bg-slate-900/30 hover:border-slate-500 hover:bg-slate-900/50"
-          } ${(isUploading || isLoadingPricing) ? "pointer-events-none opacity-80" : ""}`}
+          } ${isUploading ? "pointer-events-none opacity-80" : ""}`}
         >
-          {/* Hidden file input rendered by react-dropzone */}
           <input {...getInputProps()} />
-          
-          {/* Invisible overlay to guarantee full clickability */}
-          {!file && !isUploading && (
-            <div 
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-              onClick={(e) => { e.stopPropagation(); open(); }}
-              aria-label="Click to upload file"
-            />
-          )}
 
           <AnimatePresence mode="wait">
             {previewUrl ? (
@@ -218,7 +196,7 @@ export function ImageUploader({
                 {!isUploading && (
                   <button
                     onClick={handleClear}
-                    className="absolute top-4 right-4 bg-slate-950/80 hover:bg-red-500 text-white rounded-full p-2.5 backdrop-blur-md transition-colors shadow-lg z-30"
+                    className="absolute top-4 right-4 bg-slate-950/80 hover:bg-red-500 text-white rounded-full p-2.5 backdrop-blur-md transition-colors shadow-lg"
                   >
                     <X className="h-5 w-5" />
                   </button>
@@ -230,13 +208,13 @@ export function ImageUploader({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center py-8 relative z-10 pointer-events-none"
+                className="flex flex-col items-center justify-center py-8"
               >
                 <div className="h-20 w-20 bg-slate-800/80 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-slate-800 transition-all duration-300 shadow-xl border border-slate-700">
-                  {isLoadingPricing ? <Loader2 className="h-10 w-10 animate-spin text-slate-400" /> : <ImageIcon className="h-10 w-10 text-slate-400 group-hover:text-cyan-400 transition-colors" />}
+                  <ImageIcon className="h-10 w-10 text-slate-400 group-hover:text-cyan-400 transition-colors" />
                 </div>
                 <p className="text-slate-200 font-semibold text-lg mb-2">
-                  {isLoadingPricing ? "Loading pricing configurations..." : isDragActive ? "Drop the image here" : "Drag & drop an image, or click to browse"}
+                  {isDragActive ? "Drop the image here" : "Drag & drop an image, or click to browse"}
                 </p>
                 <p className="text-sm text-slate-500 font-medium">
                   Supports PNG, JPG, WEBP up to 25MB
@@ -269,16 +247,14 @@ export function ImageUploader({
               <span className="bg-cyan-500/20 text-cyan-400 h-6 w-6 rounded-full flex items-center justify-center text-xs">1</span>
               Output Resolution
             </Label>
-            <RadioGroup value={selectedTier} onValueChange={setSelectedTier} disabled={isUploading || isLoadingPricing} className="gap-3">
+            <RadioGroup value={selectedTier} onValueChange={setSelectedTier} disabled={isUploading} className="gap-3">
               {pricingTiers.map((tier) => (
                 <div key={tier.tier} className={`flex items-start space-x-3 border rounded-xl p-4 transition-all duration-200 ${selectedTier === tier.tier ? 'border-cyan-500 bg-cyan-500/5 shadow-[0_0_15px_rgba(6,182,212,0.1)]' : 'border-slate-800 bg-slate-900/40 hover:bg-slate-900/80 hover:border-slate-700'}`}>
                   <RadioGroupItem value={tier.tier} id={`res-${tier.tier}`} className="border-slate-500 text-cyan-500 mt-0.5" />
                   <div className="flex-1 cursor-pointer w-full">
                     <Label htmlFor={`res-${tier.tier}`} className="cursor-pointer font-bold text-slate-200 flex items-center justify-between w-full text-base">
                       <span>{tier.label}</span>
-                      <span className="text-cyan-400">
-                        {isLoadingPricing ? <Loader2 className="h-4 w-4 animate-spin inline" /> : tier.formattedPrice}
-                      </span>
+                      <span className="text-cyan-400">{tier.formattedPrice}</span>
                     </Label>
                     <p className="text-sm text-slate-500 mt-1">{tier.description}</p>
                   </div>
@@ -320,13 +296,11 @@ export function ImageUploader({
       <CardFooter className="bg-slate-900/60 p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-center border-t border-slate-800/50 gap-6">
         <div className="text-center sm:text-left">
           <div className="text-sm text-slate-400 font-medium">Total Cost</div>
-          <div className="font-extrabold text-white text-3xl">
-            {isLoadingPricing ? <Loader2 className="h-6 w-6 animate-spin inline-block mt-1" /> : activePricing.formattedPrice}
-          </div>
+          <div className="font-extrabold text-white text-3xl">{activePricing.formattedPrice}</div>
         </div>
         <Button
           onClick={handleUploadAndCheckout}
-          disabled={!file || isUploading || isLoadingPricing}
+          disabled={!file || isUploading}
           className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-500 text-white h-14 px-8 text-lg font-semibold rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] transition-all flex items-center justify-center gap-3"
         >
           {isUploading ? (
