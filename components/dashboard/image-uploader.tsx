@@ -126,6 +126,7 @@ export function ImageUploader({
           enhancementType,
           currency: activePricing.currency,
           amountPaid: activePricing.price,
+
         })
       });
 
