@@ -53,6 +53,10 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
     }
   }, [searchParams, router]);
 
+  useEffect(() => {
+    setOrders(initialOrders);
+  }, [initialOrders]);
+
   // Real-time order updates
   useEffect(() => {
     const channel = supabase
@@ -63,13 +67,14 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
           event: '*',
           schema: 'public',
           table: 'orders',
-          filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setOrders(prev => [payload.new as Order, ...prev]);
+            const newOrder = payload.new as Order;
+            setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrder.id)]);
           } else if (payload.eventType === 'UPDATE') {
-            setOrders(prev => prev.map(o => o.id === payload.new.id ? payload.new as Order : o));
+            const updatedOrder = payload.new as Order;
+            setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
           }
         }
       )
@@ -78,7 +83,7 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, user.id]);
+  }, [supabase]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -89,9 +94,12 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
   const loadThumbnail = async (orderId: string, filePath: string) => {
     if (thumbnails[orderId]) return;
     try {
-      const { data } = await supabase.storage
-        .from('raw-uploads')
-        .createSignedUrl(filePath, 120);
+      const res = await fetch("/api/storage/signed-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bucket: "raw-uploads", path: filePath, expiresIn: 300 }),
+      });
+      const data = await res.json();
       if (data?.signedUrl) {
         setThumbnails(prev => ({ ...prev, [orderId]: data.signedUrl }));
       }
@@ -112,9 +120,12 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
   const handleDownload = async (order: Order) => {
     if (!order.upscaled_image_url) return;
     try {
-      const { data } = await supabase.storage
-        .from('upscaled-outputs')
-        .createSignedUrl(order.upscaled_image_url, 300);
+      const res = await fetch("/api/storage/signed-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bucket: "upscaled-outputs", path: order.upscaled_image_url, expiresIn: 600 }),
+      });
+      const data = await res.json();
       if (data?.signedUrl) {
         window.open(data.signedUrl, '_blank');
       }
