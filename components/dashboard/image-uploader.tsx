@@ -32,14 +32,12 @@ export function ImageUploader({
   const [selectedTier, setSelectedTier] = useState<string>(initialTier);
   const [enhancementType, setEnhancementType] = useState<string>("general");
   
-  // Initialize with fallback/sync pricing to prevent hydration mismatch or blank states
   const [pricingTiers, setPricingTiers] = useState<PricingInfo[]>(getAllPricingTiers(countryCode));
   const [isLoadingPricing, setIsLoadingPricing] = useState(true);
 
   const activePricing = pricingTiers.find((t) => t.tier === selectedTier) || pricingTiers[1];
   const supabase = createClient();
 
-  // Dynamically load pricing on mount
   useEffect(() => {
     let isMounted = true;
     getAllPricingTiersDynamic(countryCode).then(tiers => {
@@ -67,7 +65,7 @@ export function ImageUploader({
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     accept: {
       "image/jpeg": [".jpeg", ".jpg"],
@@ -76,6 +74,8 @@ export function ImageUploader({
     },
     maxFiles: 1,
     disabled: isUploading || isLoadingPricing,
+    noClick: false,
+    noKeyboard: false,
   });
 
   const handleClear = (e: React.MouseEvent) => {
@@ -100,7 +100,9 @@ export function ImageUploader({
       const fileExt = file.name.split('.').pop();
       const filePath = `${userId}/${orderId}.${fileExt}`;
 
-      setUploadProgress(40);
+      setUploadProgress(30);
+
+      // Upload file to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('raw-uploads')
         .upload(filePath, file, {
@@ -110,23 +112,31 @@ export function ImageUploader({
 
       if (uploadError) throw new Error(uploadError.message);
 
-      setUploadProgress(80);
+      setUploadProgress(60);
 
-      const { error: insertError } = await supabase.from('orders').insert({
-        id: orderId,
-        user_id: user?.id || null,
-        original_image_url: filePath,
-        target_resolution: selectedTier,
-        enhancement_type: enhancementType,
-        currency: activePricing.currency,
-        amount_paid: activePricing.price,
-        status: 'pending'
+      // Create order via server-side API route (bypasses RLS)
+      const orderResponse = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          userId: user?.id || null,
+          filePath,
+          targetResolution: selectedTier,
+          enhancementType,
+          currency: activePricing.currency,
+          amountPaid: activePricing.price,
+        })
       });
 
-      if (insertError) throw new Error(insertError.message);
+      const orderData = await orderResponse.json();
+      if (!orderResponse.ok) {
+        throw new Error(orderData.error || 'Failed to create order');
+      }
 
-      setUploadProgress(100);
+      setUploadProgress(80);
 
+      // Create Stripe checkout session
       const checkoutResponse = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -147,6 +157,7 @@ export function ImageUploader({
         throw new Error(checkoutData.error || 'Failed to initialize checkout');
       }
 
+      setUploadProgress(100);
       window.location.href = checkoutData.url;
 
     } catch (err: any) {
@@ -172,6 +183,7 @@ export function ImageUploader({
       </CardHeader>
 
       <CardContent className="p-6 sm:p-8 space-y-8">
+        {/* Full clickable dropzone */}
         <div
           {...getRootProps()}
           className={`border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center transition-all duration-300 cursor-pointer relative overflow-hidden group ${
@@ -179,7 +191,17 @@ export function ImageUploader({
             file ? "border-slate-700 bg-slate-900/50" : "border-slate-700 bg-slate-900/30 hover:border-slate-500 hover:bg-slate-900/50"
           } ${(isUploading || isLoadingPricing) ? "pointer-events-none opacity-80" : ""}`}
         >
+          {/* Hidden file input rendered by react-dropzone */}
           <input {...getInputProps()} />
+          
+          {/* Invisible overlay to guarantee full clickability */}
+          {!file && !isUploading && (
+            <div 
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+              onClick={(e) => { e.stopPropagation(); open(); }}
+              aria-label="Click to upload file"
+            />
+          )}
 
           <AnimatePresence mode="wait">
             {previewUrl ? (
@@ -195,7 +217,7 @@ export function ImageUploader({
                 {!isUploading && (
                   <button
                     onClick={handleClear}
-                    className="absolute top-4 right-4 bg-slate-950/80 hover:bg-red-500 text-white rounded-full p-2.5 backdrop-blur-md transition-colors shadow-lg"
+                    className="absolute top-4 right-4 bg-slate-950/80 hover:bg-red-500 text-white rounded-full p-2.5 backdrop-blur-md transition-colors shadow-lg z-30"
                   >
                     <X className="h-5 w-5" />
                   </button>
@@ -207,7 +229,7 @@ export function ImageUploader({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center py-8"
+                className="flex flex-col items-center justify-center py-8 relative z-10 pointer-events-none"
               >
                 <div className="h-20 w-20 bg-slate-800/80 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-slate-800 transition-all duration-300 shadow-xl border border-slate-700">
                   {isLoadingPricing ? <Loader2 className="h-10 w-10 animate-spin text-slate-400" /> : <ImageIcon className="h-10 w-10 text-slate-400 group-hover:text-cyan-400 transition-colors" />}
