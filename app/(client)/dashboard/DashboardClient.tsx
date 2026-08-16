@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ImageUploader } from "@/components/dashboard/image-uploader";
-import { History, Download, Shield, LogOut, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon } from "lucide-react";
+import { History, Download, Shield, LogOut, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon, PartyPopper } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,20 +25,20 @@ interface Order {
 
 interface DashboardClientProps {
   countryCode: string;
+  initialOrders: Order[];
+  user: { id: string; email: string };
 }
 
-export function DashboardClient({ countryCode }: DashboardClientProps) {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+export function DashboardClient({ countryCode, initialOrders, user }: DashboardClientProps) {
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
 
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialTier = searchParams.get('tier') || '4k';
-
   const supabase = createClient();
 
-
+  // Payment success celebration
   useEffect(() => {
     const payment = searchParams.get('payment');
     if (payment === 'success') {
@@ -48,65 +48,28 @@ export function DashboardClient({ countryCode }: DashboardClientProps) {
         origin: { y: 0.6 },
         colors: ['#22d3ee', '#8b5cf6', '#ffffff']
       });
+      // Clean URL
       router.replace('/dashboard', undefined);
     }
+  }, [searchParams, router]);
 
-    const fetchUserAndOrders = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-
-      // Fetch initial orders
-      const query = supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (user) {
-        query.eq('user_id', user.id);
-      } else {
-        // If guest, maybe we store order IDs in local storage?
-        // For now, if guest, we won't show history unless they just created it.
-        // Or we could fall back to local storage tracked IDs.
-        const guestOrders = JSON.parse(localStorage.getItem('guest_orders') || '[]');
-        if (guestOrders.length > 0) {
-          query.in('id', guestOrders);
-        } else {
-          setOrders([]);
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      const { data, error } = await query;
-      if (!error && data) {
-        setOrders(data as Order[]);
-      }
-      setIsLoading(false);
-    };
-
-    fetchUserAndOrders();
-
-    // Subscribe to real-time changes for the orders table
+  // Real-time order updates
+  useEffect(() => {
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel('dashboard-orders')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'orders',
+          filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('Realtime payload:', payload);
           if (payload.eventType === 'INSERT') {
-             setOrders(prev => [payload.new as Order, ...prev]);
-             if (!user) {
-               // save to local storage for guests
-               const guestOrders = JSON.parse(localStorage.getItem('guest_orders') || '[]');
-               localStorage.setItem('guest_orders', JSON.stringify([...guestOrders, payload.new.id]));
-             }
+            setOrders(prev => [payload.new as Order, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
-             setOrders(prev => prev.map(o => o.id === payload.new.id ? payload.new as Order : o));
+            setOrders(prev => prev.map(o => o.id === payload.new.id ? payload.new as Order : o));
           }
         }
       )
@@ -115,11 +78,26 @@ export function DashboardClient({ countryCode }: DashboardClientProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, user]);
+  }, [supabase, user.id]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/');
+    router.refresh();
+  };
+
+  const loadThumbnail = async (orderId: string, filePath: string) => {
+    if (thumbnails[orderId]) return;
+    try {
+      const { data } = await supabase.storage
+        .from('raw-uploads')
+        .createSignedUrl(filePath, 120);
+      if (data?.signedUrl) {
+        setThumbnails(prev => ({ ...prev, [orderId]: data.signedUrl }));
+      }
+    } catch (err) {
+      console.error("Failed to load thumbnail", err);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -127,21 +105,35 @@ export function DashboardClient({ countryCode }: DashboardClientProps) {
       case 'completed': return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/50"><CheckCircle2 className="h-3 w-3 mr-1" /> Completed</Badge>;
       case 'processing': return <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/50"><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Processing</Badge>;
       case 'failed': return <Badge variant="destructive" className="bg-red-500/20 text-red-400 border-red-500/50"><AlertCircle className="h-3 w-3 mr-1" /> Failed</Badge>;
-      default: return <Badge variant="outline" className="text-slate-400 border-slate-700">Pending</Badge>;
+      default: return <Badge variant="outline" className="text-amber-400 border-amber-500/50 bg-amber-500/10">Pending</Badge>;
     }
   };
 
   const handleDownload = async (order: Order) => {
     if (!order.upscaled_image_url) return;
-
     try {
-      // In a real app, you might want to fetch the file and trigger a download,
-      // or just open the public URL in a new tab.
-      const { data } = supabase.storage.from('upscaled-outputs').getPublicUrl(order.upscaled_image_url);
-      window.open(data.publicUrl, '_blank');
+      const { data } = await supabase.storage
+        .from('upscaled-outputs')
+        .createSignedUrl(order.upscaled_image_url, 300);
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
+      }
     } catch (e) {
       console.error("Download failed", e);
     }
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  };
+
+  const formatPrice = (amount: number, currency: string) => {
+    if (currency === 'USD') return `$${amount.toFixed(2)}`;
+    if (currency === 'PKR') return `Rs. ${amount.toLocaleString()}`;
+    if (currency === 'INR') return `₹${amount.toLocaleString()}`;
+    return `${amount} ${currency}`;
   };
 
   return (
@@ -161,25 +153,28 @@ export function DashboardClient({ countryCode }: DashboardClientProps) {
           </div>
 
           <div className="flex items-center gap-4">
+            <span className="text-sm text-slate-500 hidden md:block">{user.email}</span>
             <Link href="/admin">
               <Button size="sm" variant="ghost" className="text-slate-400 hover:text-slate-200">
                 <Shield className="h-4 w-4 mr-1 text-violet-400" /> Admin
               </Button>
             </Link>
-            {user ? (
-              <Button size="sm" variant="outline" onClick={handleLogout} className="border-slate-700 hover:bg-slate-800 text-slate-300">
-                <LogOut className="h-4 w-4 mr-2" /> Sign Out
-              </Button>
-            ) : (
-              <Link href="/login">
-                 <Button size="sm" variant="outline" className="border-slate-700 hover:bg-slate-800 text-slate-300">
-                   Sign In
-                 </Button>
-              </Link>
-            )}
+            <Button size="sm" variant="outline" onClick={handleLogout} className="border-slate-700 hover:bg-slate-800 text-slate-300">
+              <LogOut className="h-4 w-4 mr-2" /> Sign Out
+            </Button>
           </div>
         </div>
       </header>
+
+      {/* Payment Success Banner */}
+      {searchParams.get('payment') === 'success' && (
+        <div className="bg-emerald-500/10 border-b border-emerald-500/30 px-4 py-3 text-center">
+          <p className="text-emerald-400 font-medium flex items-center justify-center gap-2">
+            <PartyPopper className="h-5 w-5" />
+            Payment successful! Your image is now being processed.
+          </p>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 container max-w-7xl mx-auto p-4 sm:p-8 grid grid-cols-1 xl:grid-cols-12 gap-8">
@@ -207,11 +202,7 @@ export function DashboardClient({ countryCode }: DashboardClientProps) {
             </CardHeader>
 
             <CardContent className="flex-1 space-y-4 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
-              {isLoading ? (
-                <div className="flex justify-center items-center py-12">
-                  <Loader2 className="h-8 w-8 text-cyan-500 animate-spin" />
-                </div>
-              ) : orders.length === 0 ? (
+              {orders.length === 0 ? (
                 <div className="text-center py-12 px-4 border border-slate-800 border-dashed rounded-xl bg-slate-950/30">
                   <p className="text-slate-400 text-sm">No enhancement orders yet.</p>
                   <p className="text-slate-500 text-xs mt-1">Upload an image to get started.</p>
@@ -223,9 +214,18 @@ export function DashboardClient({ countryCode }: DashboardClientProps) {
                     className="p-4 rounded-xl border border-slate-800 bg-slate-950/50 hover:bg-slate-900 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group"
                   >
                     <div className="flex items-center gap-3 w-full sm:w-auto">
-                      <div className="h-14 w-14 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden relative flex-shrink-0 flex items-center justify-center">
-                         {/* Display a small generic icon or the actual preview if we generate signed URLs. For now, an icon. */}
-                         <ImageIcon className="h-6 w-6 text-slate-500" />
+                      {/* Thumbnail */}
+                      <div 
+                        className="h-14 w-14 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden relative flex-shrink-0 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-cyan-500/50 transition-all"
+                        onClick={() => loadThumbnail(order.id, order.original_image_url)}
+                        title="Click to load preview"
+                      >
+                        {thumbnails[order.id] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={thumbnails[order.id]} alt="preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="h-6 w-6 text-slate-500 group-hover:text-slate-400" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-slate-200 flex items-center gap-2 truncate">
@@ -235,7 +235,10 @@ export function DashboardClient({ countryCode }: DashboardClientProps) {
                           <span className="text-cyan-400 font-mono uppercase bg-cyan-950/50 px-1.5 rounded">{order.target_resolution}</span>
                           <span>•</span>
                           <span className="capitalize">{order.enhancement_type}</span>
+                          <span>•</span>
+                          <span className="text-slate-500">{formatPrice(order.amount_paid, order.currency)}</span>
                         </div>
+                        <div className="text-[11px] text-slate-500 mt-1">{formatDate(order.created_at)}</div>
                       </div>
                     </div>
 
