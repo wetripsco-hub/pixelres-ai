@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { Suspense } from "react";
 import { ImageUploader } from "@/components/dashboard/image-uploader";
 import { Sparkles } from "lucide-react";
 
@@ -34,7 +35,9 @@ export default function StudioPage({
           </p>
         </div>
 
-        <ImageUploader countryCode={countryCode} initialTier={initialTier} />
+        <Suspense fallback={<div className="p-12 text-center text-slate-400">Loading uploader...</div>}>
+          <ImageUploader countryCode={countryCode} initialTier={initialTier} />
+        </Suspense>
       </div>
     </div>
   );
