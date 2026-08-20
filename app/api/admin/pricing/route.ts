@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { cookies } from 'next/headers';
+import { isAdmin } from '@/app/(admin)/admin/actions';
 
-function isAuthorized(): boolean {
-  const cookieStore = cookies();
-  return cookieStore.get('admin_pin_access')?.value === 'true';
-}
 
 // GET /api/admin/pricing — Fetch all pricing tiers
 export async function GET() {
-  if (!isAuthorized()) {
+  if (!(await isAdmin())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -32,7 +28,7 @@ export async function GET() {
 
 // PUT /api/admin/pricing — Update pricing tiers
 export async function PUT(req: Request) {
-  if (!isAuthorized()) {
+  if (!(await isAdmin())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
