@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 
 interface Order {
   id: string;
@@ -221,13 +222,13 @@ export function AdminDashboardClient({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
-        return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/40"><CheckCircle2 className="h-3 w-3 mr-1" /> Completed</Badge>;
+        return <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"><CheckCircle2 className="h-3 w-3 mr-1" /> Completed</Badge>;
       case "processing":
-        return <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/40"><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Processing</Badge>;
+        return <Badge className="bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30"><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Processing</Badge>;
       case "failed":
-        return <Badge variant="destructive" className="bg-red-500/20 text-red-400 border-red-500/40"><AlertCircle className="h-3 w-3 mr-1" /> Failed</Badge>;
+        return <Badge variant="destructive" className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30"><AlertCircle className="h-3 w-3 mr-1" /> Failed</Badge>;
       default:
-        return <Badge variant="outline" className="text-amber-400 border-amber-500/40 bg-amber-500/10"><Clock className="h-3 w-3 mr-1" /> Pending</Badge>;
+        return <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10"><Clock className="h-3 w-3 mr-1" /> Pending</Badge>;
     }
   };
 
@@ -239,30 +240,30 @@ export function AdminDashboardClient({
   };
 
   return (
-    <div className="min-h-screen bg-[#07090E] text-slate-50 font-sans flex flex-col md:flex-row relative selection:bg-cyan-900/50">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#07090E] dark:text-slate-50 font-sans flex flex-col md:flex-row relative selection:bg-cyan-500/30 transition-colors duration-200">
       {/* Background Ambience */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] rounded-full bg-cyan-900/10 blur-[140px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] rounded-full bg-violet-900/10 blur-[140px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff08_1px,transparent_1px)] [background-size:24px_24px] opacity-30" />
+        <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] rounded-full bg-cyan-500/10 dark:bg-cyan-900/10 blur-[140px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] rounded-full bg-violet-500/10 dark:bg-violet-900/10 blur-[140px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(#00000008_1px,transparent_1px)] dark:bg-[radial-gradient(#ffffff08_1px,transparent_1px)] [background-size:24px_24px] opacity-40" />
       </div>
 
       {/* ── Collapsible / Fixed Modern Sidebar ── */}
-      <aside className="w-full md:w-64 lg:w-72 bg-slate-950/80 border-r border-white/10 backdrop-blur-2xl flex flex-col justify-between z-20 shrink-0 sticky top-0 md:h-screen">
+      <aside className="w-full md:w-64 lg:w-72 bg-white/80 dark:bg-slate-950/80 border-r border-slate-200 dark:border-white/10 backdrop-blur-2xl flex flex-col justify-between z-20 shrink-0 sticky top-0 md:h-screen transition-colors duration-200">
         <div>
           {/* Brand Header */}
-          <div className="p-6 border-b border-white/10">
+          <div className="p-6 border-b border-slate-200 dark:border-white/10">
             <Link href="/admin" className="flex items-center gap-3 group">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-600 p-[1px] shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-all">
-                <div className="h-full w-full bg-[#07090E] rounded-[11px] flex items-center justify-center">
-                  <Shield className="h-5 w-5 text-cyan-400" />
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-600 p-[1px] shadow-md shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-all">
+                <div className="h-full w-full bg-white dark:bg-[#07090E] rounded-[11px] flex items-center justify-center">
+                  <Shield className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
               </div>
               <div className="flex flex-col">
-                <span className="font-extrabold text-lg text-slate-100 tracking-tight">
-                  PixelRes <span className="bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">Admin</span>
+                <span className="font-extrabold text-lg text-slate-900 dark:text-slate-100 tracking-tight">
+                  PixelRes <span className="bg-gradient-to-r from-cyan-500 to-violet-500 bg-clip-text text-transparent">Admin</span>
                 </span>
-                <span className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">Command Center</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold tracking-wider uppercase">Command Center</span>
               </div>
             </Link>
 
@@ -270,7 +271,7 @@ export function AdminDashboardClient({
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full bg-slate-900/60 border-white/10 hover:border-cyan-500/40 text-slate-300 hover:text-white rounded-xl text-xs flex items-center justify-center gap-2 transition-all"
+                className="w-full bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 hover:border-cyan-500/40 text-slate-700 dark:text-slate-300 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Back to Studio App
@@ -284,15 +285,15 @@ export function AdminDashboardClient({
               onClick={() => setActiveNav("orders")}
               className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all ${
                 activeNav === "orders"
-                  ? "bg-gradient-to-r from-cyan-500/15 to-violet-500/10 border border-cyan-500/30 text-cyan-400 shadow-sm"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/50"
+                  ? "bg-cyan-500/10 dark:bg-gradient-to-r dark:from-cyan-500/15 dark:to-violet-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900/50"
               }`}
             >
               <div className="flex items-center gap-3">
                 <LayoutDashboard className="h-4 w-4" />
                 <span>Orders & Overview</span>
               </div>
-              <Badge variant="outline" className="text-[10px] border-slate-700 bg-slate-900/80 text-slate-300">
+              <Badge variant="outline" className="text-[10px] border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300">
                 {orders.length}
               </Badge>
             </button>
@@ -301,8 +302,8 @@ export function AdminDashboardClient({
               onClick={() => setActiveNav("pricing")}
               className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all ${
                 activeNav === "pricing"
-                  ? "bg-gradient-to-r from-cyan-500/15 to-violet-500/10 border border-cyan-500/30 text-cyan-400 shadow-sm"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/50"
+                  ? "bg-cyan-500/10 dark:bg-gradient-to-r dark:from-cyan-500/15 dark:to-violet-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900/50"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -315,8 +316,8 @@ export function AdminDashboardClient({
               onClick={() => setActiveNav("settings")}
               className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all ${
                 activeNav === "settings"
-                  ? "bg-gradient-to-r from-cyan-500/15 to-violet-500/10 border border-cyan-500/30 text-cyan-400 shadow-sm"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/50"
+                  ? "bg-cyan-500/10 dark:bg-gradient-to-r dark:from-cyan-500/15 dark:to-violet-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900/50"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -328,17 +329,17 @@ export function AdminDashboardClient({
         </div>
 
         {/* Bottom Pinned Profile & Logout */}
-        <div className="p-4 border-t border-white/10 space-y-3">
-          <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-slate-900/60 border border-white/10">
-            <div className="h-9 w-9 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
+        <div className="p-4 border-t border-slate-200 dark:border-white/10 space-y-3">
+          <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-white/10">
+            <div className="h-9 w-9 rounded-xl bg-violet-500/10 border border-violet-500/30 flex items-center justify-center text-violet-600 dark:text-violet-400">
               <User className="h-4 w-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-slate-200 truncate">
+              <div className="text-xs font-bold text-slate-900 dark:text-slate-200 truncate">
                 {adminEmail || "wetrips.co@gmail.com"}
               </div>
-              <div className="text-[10px] text-emerald-400 flex items-center gap-1 font-medium">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 Super Admin
               </div>
             </div>
@@ -348,7 +349,7 @@ export function AdminDashboardClient({
             variant="ghost"
             size="sm"
             onClick={handleLogout}
-            className="w-full text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+            className="w-full text-slate-600 dark:text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 border border-transparent rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all"
           >
             <LogOut className="h-3.5 w-3.5" />
             Sign Out of Admin
@@ -359,15 +360,15 @@ export function AdminDashboardClient({
       {/* ── Main Content Area ── */}
       <div className="flex-1 flex flex-col min-w-0 z-10">
         {/* Top Header */}
-        <header className="h-18 px-6 sm:px-8 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl sticky top-0 z-30 flex items-center justify-between">
+        <header className="h-18 px-6 sm:px-8 border-b border-slate-200 dark:border-white/10 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl sticky top-0 z-30 flex items-center justify-between transition-colors duration-200">
           <div className="flex items-center gap-3">
             <div className="flex flex-col">
-              <h2 className="text-lg font-bold text-slate-100 tracking-tight">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                 {activeNav === "orders" && "Orders Command Center"}
                 {activeNav === "pricing" && "Multi-Currency Dynamic Pricing Manager"}
                 {activeNav === "settings" && "System Health & Infrastructure"}
               </h2>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 {activeNav === "orders" && "Manage customer queue, deliver finished 8K renders, and track revenue."}
                 {activeNav === "pricing" && "Configure live resolution rates for global currencies (USD, PKR, INR)."}
                 {activeNav === "settings" && "Overview of storage buckets, database RLS bypass, and Stripe webhook status."}
@@ -376,8 +377,10 @@ export function AdminDashboardClient({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <ThemeToggle />
+
+            <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>System Online</span>
             </div>
 
@@ -386,9 +389,9 @@ export function AdminDashboardClient({
               variant="outline"
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="border-white/10 bg-slate-900/60 hover:bg-slate-800 text-slate-200 rounded-xl text-xs flex items-center gap-2"
+              className="border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs flex items-center gap-2 shadow-sm"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-cyan-400" : ""}`} />
+              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-cyan-500" : ""}`} />
               Refresh Data
             </Button>
           </div>
@@ -401,56 +404,56 @@ export function AdminDashboardClient({
             <>
               {/* Stat Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <Card className="bg-slate-900/60 border-white/10 backdrop-blur-2xl rounded-3xl p-5 shadow-xl">
-                  <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+                <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-white/10 backdrop-blur-2xl rounded-3xl p-5 shadow-xl">
+                  <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
                     <span>Total Revenue</span>
-                    <DollarSign className="h-4 w-4 text-emerald-400" />
+                    <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   </div>
-                  <div className="mt-2 text-2xl font-black text-white">
+                  <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white font-mono">
                     ${metrics.totalUsdRevenue.toFixed(2)}
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-2 flex flex-wrap gap-2">
-                    <span className="text-cyan-400 font-mono">Rs. {metrics.totalPkrRevenue.toLocaleString()}</span>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 flex flex-wrap gap-2">
+                    <span className="text-cyan-600 dark:text-cyan-400 font-mono">Rs. {metrics.totalPkrRevenue.toLocaleString()}</span>
                     <span>•</span>
-                    <span className="text-violet-400 font-mono">₹{metrics.totalInrRevenue.toLocaleString()}</span>
+                    <span className="text-violet-600 dark:text-violet-400 font-mono">₹{metrics.totalInrRevenue.toLocaleString()}</span>
                   </div>
                 </Card>
 
-                <Card className="bg-slate-900/60 border-white/10 backdrop-blur-2xl rounded-3xl p-5 shadow-xl">
-                  <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+                <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-white/10 backdrop-blur-2xl rounded-3xl p-5 shadow-xl">
+                  <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
                     <span>Active / Processing</span>
-                    <Zap className="h-4 w-4 text-cyan-400" />
+                    <Zap className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
                   </div>
-                  <div className="mt-2 text-2xl font-black text-cyan-400">
+                  <div className="mt-2 text-2xl font-black text-cyan-600 dark:text-cyan-400 font-mono">
                     {metrics.pendingJobs}
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-2">
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
                     Jobs awaiting AI render or delivery
                   </div>
                 </Card>
 
-                <Card className="bg-slate-900/60 border-white/10 backdrop-blur-2xl rounded-3xl p-5 shadow-xl">
-                  <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+                <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-white/10 backdrop-blur-2xl rounded-3xl p-5 shadow-xl">
+                  <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
                     <span>Completed Deliverables</span>
-                    <CheckCircle className="h-4 w-4 text-emerald-400" />
+                    <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   </div>
-                  <div className="mt-2 text-2xl font-black text-emerald-400">
+                  <div className="mt-2 text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
                     {metrics.completedJobs}
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-2">
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
                     Successfully fulfilled 8K outputs
                   </div>
                 </Card>
 
-                <Card className="bg-slate-900/60 border-white/10 backdrop-blur-2xl rounded-3xl p-5 shadow-xl">
-                  <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+                <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-white/10 backdrop-blur-2xl rounded-3xl p-5 shadow-xl">
+                  <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
                     <span>Total Orders Volume</span>
-                    <FileImage className="h-4 w-4 text-violet-400" />
+                    <FileImage className="h-4 w-4 text-violet-600 dark:text-violet-400" />
                   </div>
-                  <div className="mt-2 text-2xl font-black text-white">
+                  <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white font-mono">
                     {metrics.totalOrders}
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-2">
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
                     Combined guest & customer queue
                   </div>
                 </Card>
@@ -459,12 +462,12 @@ export function AdminDashboardClient({
               {/* Search & Filter Bar */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     placeholder="Search by Order ID, customer email, or resolution…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-11 bg-slate-900/80 border-white/10 focus:border-cyan-500 text-white rounded-2xl text-xs placeholder:text-slate-500"
+                    className="pl-10 h-11 bg-white/80 dark:bg-slate-900/80 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-2xl text-xs placeholder:text-slate-400"
                   />
                 </div>
 
@@ -475,8 +478,8 @@ export function AdminDashboardClient({
                       onClick={() => setStatusFilter(status)}
                       className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap ${
                         statusFilter === status
-                          ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
-                          : "bg-slate-900/60 text-slate-400 border border-white/10 hover:bg-slate-800 hover:text-white"
+                          ? "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/40 shadow-sm"
+                          : "bg-white/80 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800"
                       }`}
                     >
                       {status} ({orders.filter((o) => status === "all" || o.status === status).length})
@@ -486,12 +489,12 @@ export function AdminDashboardClient({
               </div>
 
               {/* Orders Table */}
-              <Card className="bg-slate-900/60 border-white/10 backdrop-blur-2xl rounded-3xl shadow-2xl overflow-hidden">
-                <CardHeader className="p-6 border-b border-white/10">
+              <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-white/10 backdrop-blur-2xl rounded-3xl shadow-2xl overflow-hidden">
+                <CardHeader className="p-6 border-b border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-slate-950/40">
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="text-lg font-bold text-slate-100">Orders Management Queue</CardTitle>
-                      <CardDescription className="text-xs text-slate-400 mt-0.5">
+                      <CardTitle className="text-lg font-bold text-slate-900 dark:text-slate-100">Orders Management Queue</CardTitle>
+                      <CardDescription className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         Showing {filteredOrders.length} of {orders.length} total orders
                       </CardDescription>
                     </div>
@@ -499,8 +502,8 @@ export function AdminDashboardClient({
                 </CardHeader>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm text-slate-300">
-                    <thead className="bg-slate-950/80 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-white/10">
+                  <table className="w-full text-left text-sm text-slate-700 dark:text-slate-300">
+                    <thead className="bg-slate-100/80 dark:bg-slate-950/80 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-white/10">
                       <tr>
                         <th className="py-4 px-6">Order Details</th>
                         <th className="py-4 px-6">Customer</th>
@@ -511,21 +514,21 @@ export function AdminDashboardClient({
                         <th className="py-4 px-6 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5 font-medium">
+                    <tbody className="divide-y divide-slate-100 dark:divide-white/5 font-medium">
                       {filteredOrders.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="text-center py-16 text-slate-400">
-                            <FileImage className="h-10 w-10 text-slate-600 mx-auto mb-3" />
-                            <p className="font-semibold text-base text-slate-300">No orders match your filter.</p>
+                            <FileImage className="h-10 w-10 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
+                            <p className="font-semibold text-base text-slate-800 dark:text-slate-300">No orders match your filter.</p>
                             <p className="text-xs text-slate-500 mt-1">Try changing the status filter or clearing your search term.</p>
                           </td>
                         </tr>
                       ) : (
                         filteredOrders.map((order) => (
-                          <tr key={order.id} className="hover:bg-slate-800/40 transition-colors">
+                          <tr key={order.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                             {/* Order ID & Date */}
                             <td className="py-4 px-6">
-                              <div className="font-mono font-bold text-slate-200 text-xs">{order.id.substring(0, 8)}…</div>
+                              <div className="font-mono font-bold text-slate-900 dark:text-slate-200 text-xs">{order.id.substring(0, 8)}…</div>
                               <div className="text-[11px] text-slate-500 mt-0.5" title={order.created_at}>
                                 {formatDistanceToNow(new Date(order.created_at), { addSuffix: true })}
                               </div>
@@ -533,7 +536,7 @@ export function AdminDashboardClient({
 
                             {/* Customer Email */}
                             <td className="py-4 px-6">
-                              <div className="text-xs font-semibold text-slate-200">
+                              <div className="text-xs font-semibold text-slate-900 dark:text-slate-200">
                                 {order.guest_email || "Guest Order"}
                               </div>
                               <div className="text-[10px] text-slate-500">
@@ -545,14 +548,14 @@ export function AdminDashboardClient({
                             <td className="py-4 px-6">
                               <div
                                 onClick={() => loadThumbnail(order.id, order.original_image_url)}
-                                className="h-12 w-12 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center overflow-hidden cursor-pointer hover:border-cyan-400 transition-all relative group"
+                                className="h-12 w-12 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden cursor-pointer hover:border-cyan-500 transition-all relative group"
                                 title="Click to load image preview"
                               >
                                 {thumbnails[order.id] ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img src={thumbnails[order.id]} alt="Original Preview" className="h-full w-full object-cover" />
                                 ) : (
-                                  <ImageIcon className="h-5 w-5 text-slate-500 group-hover:text-cyan-400" />
+                                  <ImageIcon className="h-5 w-5 text-slate-400 group-hover:text-cyan-500" />
                                 )}
                               </div>
                             </td>
@@ -560,17 +563,17 @@ export function AdminDashboardClient({
                             {/* Resolution & Mode */}
                             <td className="py-4 px-6">
                               <div className="flex items-center gap-1.5">
-                                <Badge variant="outline" className="font-mono text-cyan-400 border-cyan-500/30 bg-cyan-950/40 text-[10px] uppercase">
+                                <Badge variant="outline" className="font-mono text-cyan-700 dark:text-cyan-400 border-cyan-500/30 bg-cyan-50 dark:bg-cyan-950/40 text-[10px] uppercase">
                                   {order.target_resolution}
                                 </Badge>
                               </div>
-                              <div className="text-[11px] text-slate-400 capitalize mt-1">
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 capitalize mt-1">
                                 {order.enhancement_type}
                               </div>
                             </td>
 
                             {/* Amount */}
-                            <td className="py-4 px-6 font-mono font-bold text-slate-200">
+                            <td className="py-4 px-6 font-mono font-bold text-slate-900 dark:text-slate-200">
                               {formatPrice(order.amount_paid, order.currency)}
                             </td>
 
@@ -586,7 +589,7 @@ export function AdminDashboardClient({
                                 variant="outline"
                                 onClick={() => handleDownloadOriginal(order.id, order.original_image_url)}
                                 disabled={isProcessingId === order.id}
-                                className="h-8 px-2.5 bg-slate-900/60 border-white/10 hover:border-cyan-500/40 text-xs text-slate-300 hover:text-white rounded-xl"
+                                className="h-8 px-2.5 bg-white dark:bg-slate-900/60 border-slate-200 dark:border-white/10 hover:border-cyan-500/40 text-xs text-slate-700 dark:text-slate-300 rounded-xl shadow-sm"
                                 title="Download Customer Raw File"
                               >
                                 <Download className="h-3.5 w-3.5" />
@@ -614,14 +617,14 @@ export function AdminDashboardClient({
           {/* ═══════════ PRICING & MULTI-CURRENCY PANEL ═══════════ */}
           {activeNav === "pricing" && (
             <div className="max-w-4xl space-y-6">
-              <Card className="bg-slate-900/60 border-white/10 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 sm:p-8">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
+              <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-white/10 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 sm:p-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-white/10 pb-6">
                   <div>
-                    <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-                      <CreditCard className="h-5 w-5 text-cyan-400" />
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
                       Resolution Tier Pricing Rates
                     </h3>
-                    <p className="text-slate-400 text-xs mt-1">
+                    <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
                       Set base rates for Web (~2K), 4K Ultra HD, and 8K Print-Ready in USD, PKR, and INR.
                     </p>
                   </div>
@@ -644,8 +647,8 @@ export function AdminDashboardClient({
                   <div
                     className={`mt-4 p-4 rounded-2xl text-xs font-semibold flex items-center gap-2 ${
                       pricingMessage.type === "success"
-                        ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
-                        : "bg-red-500/10 border border-red-500/20 text-red-400"
+                        ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400"
+                        : "bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400"
                     }`}
                   >
                     <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -655,49 +658,49 @@ export function AdminDashboardClient({
 
                 <div className="space-y-6 mt-6">
                   {pricing.map((tier) => (
-                    <div key={tier.id} className="p-6 rounded-2xl bg-slate-950/60 border border-white/10 space-y-4">
+                    <div key={tier.id} className="p-6 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200 dark:border-white/10 space-y-4">
                       <div className="flex items-center justify-between">
-                        <span className="font-extrabold text-base text-slate-100 uppercase tracking-wider">
+                        <span className="font-extrabold text-base text-slate-900 dark:text-slate-100 uppercase tracking-wider">
                           {tier.id === "web" && "Web & Social (~2000px)"}
                           {tier.id === "4k" && "4K Ultra HD (~4000px)"}
                           {tier.id === "8k" && "8K Print-Ready (~8000px)"}
                         </span>
-                        <Badge variant="outline" className="font-mono text-cyan-400 border-cyan-500/30 text-xs uppercase">
+                        <Badge variant="outline" className="font-mono text-cyan-700 dark:text-cyan-400 border-cyan-500/30 text-xs uppercase">
                           Tier: {tier.id}
                         </Badge>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-slate-400 font-semibold">USD Price ($)</Label>
+                          <Label className="text-xs text-slate-600 dark:text-slate-400 font-semibold">USD Price ($)</Label>
                           <Input
                             type="number"
                             step="0.01"
                             value={tier.usd_price}
                             onChange={(e) => handlePriceChange(tier.id, "usd_price", parseFloat(e.target.value) || 0)}
-                            className="bg-slate-900/80 border-white/10 focus:border-cyan-500 text-white rounded-xl text-sm font-mono"
+                            className="bg-white dark:bg-slate-900/80 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-xl text-sm font-mono"
                           />
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-slate-400 font-semibold">PKR Price (Rs.)</Label>
+                          <Label className="text-xs text-slate-600 dark:text-slate-400 font-semibold">PKR Price (Rs.)</Label>
                           <Input
                             type="number"
                             step="1"
                             value={tier.pkr_price}
                             onChange={(e) => handlePriceChange(tier.id, "pkr_price", parseFloat(e.target.value) || 0)}
-                            className="bg-slate-900/80 border-white/10 focus:border-cyan-500 text-white rounded-xl text-sm font-mono"
+                            className="bg-white dark:bg-slate-900/80 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-xl text-sm font-mono"
                           />
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-slate-400 font-semibold">INR Price (₹)</Label>
+                          <Label className="text-xs text-slate-600 dark:text-slate-400 font-semibold">INR Price (₹)</Label>
                           <Input
                             type="number"
                             step="1"
                             value={tier.inr_price}
                             onChange={(e) => handlePriceChange(tier.id, "inr_price", parseFloat(e.target.value) || 0)}
-                            className="bg-slate-900/80 border-white/10 focus:border-cyan-500 text-white rounded-xl text-sm font-mono"
+                            className="bg-white dark:bg-slate-900/80 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-xl text-sm font-mono"
                           />
                         </div>
                       </div>
@@ -711,46 +714,46 @@ export function AdminDashboardClient({
           {/* ═══════════ SETTINGS PANEL ═══════════ */}
           {activeNav === "settings" && (
             <div className="max-w-4xl space-y-6">
-              <Card className="bg-slate-900/60 border-white/10 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 sm:p-8">
-                <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2 border-b border-white/10 pb-4">
-                  <Database className="h-5 w-5 text-violet-400" />
+              <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-white/10 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 sm:p-8">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-100 dark:border-white/10 pb-4">
+                  <Database className="h-5 w-5 text-violet-600 dark:text-violet-400" />
                   System Health & Infrastructure Overview
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
-                  <div className="p-5 rounded-2xl bg-slate-950/60 border border-white/10 space-y-2">
+                  <div className="p-5 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200 dark:border-white/10 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-400 font-semibold uppercase">Storage: Raw Uploads</span>
-                      <Badge className="bg-emerald-500/20 text-emerald-400 text-[10px] border-emerald-500/30">Active</Badge>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase">Storage: Raw Uploads</span>
+                      <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] border-emerald-500/30">Active</Badge>
                     </div>
-                    <p className="text-sm font-bold text-slate-200">raw-uploads (25MB Limit)</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-slate-200">raw-uploads (25MB Limit)</p>
                     <p className="text-xs text-slate-500">Bypasses client RLS via server upload router.</p>
                   </div>
 
-                  <div className="p-5 rounded-2xl bg-slate-950/60 border border-white/10 space-y-2">
+                  <div className="p-5 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200 dark:border-white/10 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-400 font-semibold uppercase">Storage: Deliverables</span>
-                      <Badge className="bg-emerald-500/20 text-emerald-400 text-[10px] border-emerald-500/30">Active</Badge>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase">Storage: Deliverables</span>
+                      <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] border-emerald-500/30">Active</Badge>
                     </div>
-                    <p className="text-sm font-bold text-slate-200">upscaled-outputs (Public / Signed)</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-slate-200">upscaled-outputs (Public / Signed)</p>
                     <p className="text-xs text-slate-500">Supports 8K renders with temporary signed download URLs.</p>
                   </div>
 
-                  <div className="p-5 rounded-2xl bg-slate-950/60 border border-white/10 space-y-2">
+                  <div className="p-5 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200 dark:border-white/10 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-400 font-semibold uppercase">Payment Engine</span>
-                      <Badge className="bg-cyan-500/20 text-cyan-400 text-[10px] border-cyan-500/30">Stripe / Sandbox</Badge>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase">Payment Engine</span>
+                      <Badge className="bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 text-[10px] border-cyan-500/30">Stripe / Sandbox</Badge>
                     </div>
-                    <p className="text-sm font-bold text-slate-200">Stripe API (2025-02-24.acacia)</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-slate-200">Stripe API (2025-02-24.acacia)</p>
                     <p className="text-xs text-slate-500">Includes automatic sandbox fallback for test checkouts.</p>
                   </div>
 
-                  <div className="p-5 rounded-2xl bg-slate-950/60 border border-white/10 space-y-2">
+                  <div className="p-5 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200 dark:border-white/10 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-400 font-semibold uppercase">Admin Email Access</span>
-                      <Badge className="bg-violet-500/20 text-violet-400 text-[10px] border-violet-500/30">Authorized</Badge>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase">Admin Email Access</span>
+                      <Badge className="bg-violet-500/15 text-violet-600 dark:text-violet-400 text-[10px] border-violet-500/30">Authorized</Badge>
                     </div>
-                    <p className="text-sm font-bold text-slate-200">{adminEmail || "wetrips.co@gmail.com"}</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-slate-200">{adminEmail || "wetrips.co@gmail.com"}</p>
                     <p className="text-xs text-slate-500">Full admin rights granted by default.</p>
                   </div>
                 </div>
@@ -762,36 +765,36 @@ export function AdminDashboardClient({
 
       {/* ── Deliverable Upload Modal ── */}
       <Dialog open={uploadModalOpen} onOpenChange={setUploadModalOpen}>
-        <DialogContent className="bg-slate-950 border-white/10 text-slate-50 max-w-md rounded-3xl p-6 shadow-2xl backdrop-blur-2xl">
+        <DialogContent className="bg-white dark:bg-slate-950 border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-50 max-w-md rounded-3xl p-6 shadow-2xl backdrop-blur-2xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
-              <Upload className="h-5 w-5 text-cyan-400" />
+            <DialogTitle className="text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100">
+              <Upload className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
               Upload Finished 8K Deliverable
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-400 mt-1">
-              Order ID: <span className="font-mono text-cyan-300">{uploadOrder?.id}</span>
+            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Order ID: <span className="font-mono text-cyan-600 dark:text-cyan-300">{uploadOrder?.id}</span>
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 my-4">
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/10 text-xs space-y-1.5">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/10 text-xs space-y-1.5">
               <div className="flex justify-between">
-                <span className="text-slate-400">Target Fidelity:</span>
-                <span className="font-bold text-slate-200 uppercase">{uploadOrder?.target_resolution}</span>
+                <span className="text-slate-500 dark:text-slate-400">Target Fidelity:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200 uppercase">{uploadOrder?.target_resolution}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Customer:</span>
-                <span className="font-semibold text-slate-200">{uploadOrder?.guest_email || "Guest"}</span>
+                <span className="text-slate-500 dark:text-slate-400">Customer:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{uploadOrder?.guest_email || "Guest"}</span>
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-300">Select Upscaled High-Res Image</Label>
+              <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Select Upscaled High-Res Image</Label>
               <Input
                 type="file"
                 accept="image/*"
                 onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                className="bg-slate-900 border-white/10 text-xs file:text-cyan-400 file:bg-cyan-950 file:border-0 file:rounded-lg file:px-3 file:py-1 rounded-xl cursor-pointer"
+                className="bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-xs file:text-cyan-600 dark:file:text-cyan-400 file:bg-cyan-50 dark:file:bg-cyan-950 file:border-0 file:rounded-lg file:px-3 file:py-1 rounded-xl cursor-pointer"
               />
             </div>
           </div>
@@ -801,7 +804,7 @@ export function AdminDashboardClient({
               variant="outline"
               size="sm"
               onClick={() => setUploadModalOpen(false)}
-              className="border-white/10 text-slate-400 hover:text-white rounded-xl text-xs"
+              className="border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl text-xs"
             >
               Cancel
             </Button>

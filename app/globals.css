@@ -4,13 +4,45 @@
 
 @layer base {
   :root {
-    --background: 222.2 84% 4.9%;
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 189 94% 43%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 250 89% 65%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 189 94% 43%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 228 33% 4%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 6.5%;
+    --card: 224 35% 8%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 6.5%;
+    --popover: 224 35% 8%;
     --popover-foreground: 210 40% 98%;
 
     --primary: 189 94% 43%;
@@ -31,31 +63,18 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 189 94% 43%;
-
-    --radius: 0.75rem;
   }
 }
 
 body {
-  background-color: #080c14;
-  color: #f8fafc;
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
 }
 
 /* Glassmorphism & Custom Accents */
 .glass-panel {
-  background: rgba(15, 23, 42, 0.75);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.glass-card {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
 .glow-cyan {
@@ -70,22 +89,22 @@ body {
   text-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
 }
 
-.bg-grid-pattern {
-  background-size: 40px 40px;
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-}
-
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
+.dark ::-webkit-scrollbar-track {
+  background: #07090E;
+}
 ::-webkit-scrollbar-track {
-  background: #080c14;
+  background: #f1f5f9;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: #cbd5e1;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {

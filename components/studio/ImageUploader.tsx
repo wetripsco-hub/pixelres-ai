@@ -2,15 +2,20 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { UploadCloud, Image as ImageIcon, X, Loader2, Info, CreditCard, AlertTriangle, Mail, Sparkles, Check, ArrowRight } from "lucide-react";
+import { 
+  UploadCloud, Image as ImageIcon, X, Loader2, CreditCard, AlertTriangle, 
+  Mail, Sparkles, Check, ArrowRight, Maximize2, ShieldCheck, Lock, 
+  Layers, UserCheck, Zap, Sliders, CheckCircle2, RefreshCw
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
 import { getAllPricingTiersDynamic, getAllPricingTiers, PricingInfo } from "@/lib/pricing";
 import { motion, AnimatePresence } from "framer-motion";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export interface StudioImageUploaderProps {
   countryCode?: string;
@@ -23,18 +28,20 @@ export function StudioImageUploader({
 }: StudioImageUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fileMetadata, setFileMetadata] = useState<{ width: number; height: number; size: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [selectedTier, setSelectedTier] = useState<string>(initialTier);
   const [enhancementType, setEnhancementType] = useState<string>("general");
+  const [zoomOpen, setZoomOpen] = useState(false);
   
   // User & Guest State
   const [currentUser, setCurrentUser] = useState<{ id: string; email: string } | null>(null);
   const [guestEmail, setGuestEmail] = useState("");
   const [isCheckedUser, setIsCheckedUser] = useState(false);
 
-  // Pricing: start with sync fallback, then load dynamic
+  // Pricing
   const [pricingTiers, setPricingTiers] = useState<PricingInfo[]>(getAllPricingTiers(countryCode));
   const [isLoadingPricing, setIsLoadingPricing] = useState(true);
 
@@ -68,24 +75,40 @@ export function StudioImageUploader({
     return () => { cancelled = true; };
   }, [countryCode]);
 
-  // File drop handler with validation
+  // Read file dimensions & size
+  const handleFileSelection = (selectedFile: File) => {
+    setFile(selectedFile);
+    const objectUrl = URL.createObjectURL(selectedFile);
+    setPreviewUrl(objectUrl);
+
+    const sizeFormatted = (selectedFile.size / (1024 * 1024)).toFixed(2) + " MB";
+    const img = new Image();
+    img.onload = () => {
+      setFileMetadata({
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        size: sizeFormatted,
+      });
+    };
+    img.src = objectUrl;
+  };
+
+  // Dropzone callback
   const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
     setError(null);
     if (rejectedFiles.length > 0) {
       const rejection = rejectedFiles[0];
       if (rejection.errors?.[0]?.code === "file-too-large") {
-        setError("File exceeds 25 MB limit.");
+        setError("File exceeds 25 MB limit. Please upload a smaller image.");
       } else if (rejection.errors?.[0]?.code === "file-invalid-type") {
         setError("Unsupported format. Please upload JPG, PNG, or WEBP.");
       } else {
-        setError("File rejected. Please try a different image.");
+        setError("File rejected. Please select a valid image.");
       }
       return;
     }
     if (acceptedFiles.length > 0) {
-      const selectedFile = acceptedFiles[0];
-      setFile(selectedFile);
-      setPreviewUrl(URL.createObjectURL(selectedFile));
+      handleFileSelection(acceptedFiles[0]);
     }
   }, []);
 
@@ -103,38 +126,37 @@ export function StudioImageUploader({
     noKeyboard: false,
   });
 
-  const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleClear = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setFile(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
+    setFileMetadata(null);
     setError(null);
   };
 
   const handleUploadAndCheckout = async () => {
     if (!file) return;
 
-    // Optional validation for guest email format if entered
     if (!currentUser && guestEmail.trim() && !guestEmail.includes("@")) {
-      setError("Please enter a valid email address to receive your order receipt.");
+      setError("Please enter a valid email address to receive your download link.");
       return;
     }
 
     setIsUploading(true);
     setError(null);
-    setUploadProgress(10);
+    setUploadProgress(15);
 
     try {
-      // 1. Get user id & customer email
       const userId = currentUser?.id || null;
       const effectiveCustomerEmail = currentUser?.email || (guestEmail.trim() ? guestEmail.trim() : null);
       const orderId = crypto.randomUUID();
       const fileExt = file.name.split(".").pop() || "jpg";
       const storagePath = `${userId || "guest"}/${orderId}.${fileExt}`;
 
-      setUploadProgress(25);
+      setUploadProgress(35);
 
-      // 2. Upload raw image securely via server API (bypasses Storage RLS)
+      // 1. Upload raw image securely to Supabase Storage via server API (bypasses RLS)
       const uploadFormData = new FormData();
       uploadFormData.append("file", file);
       uploadFormData.append("path", storagePath);
@@ -149,9 +171,9 @@ export function StudioImageUploader({
         throw new Error(uploadData.error || "Failed to upload image.");
       }
 
-      setUploadProgress(50);
+      setUploadProgress(60);
 
-      // 3. Create order via server-side route (bypasses RLS)
+      // 2. Create order record
       const orderRes = await fetch("/api/orders/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -172,9 +194,9 @@ export function StudioImageUploader({
         throw new Error(orderData.error || "Failed to create order record.");
       }
 
-      setUploadProgress(75);
+      setUploadProgress(80);
 
-      // 4. Create Stripe checkout session
+      // 3. Create Stripe checkout session
       const checkoutRes = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -196,11 +218,11 @@ export function StudioImageUploader({
 
       setUploadProgress(100);
 
-      // 5. Redirect to Stripe (or sandbox fallback)
+      // 4. Redirect to checkout
       if (checkoutData.url) {
         window.location.href = checkoutData.url;
       } else {
-        throw new Error("No checkout URL returned.");
+        throw new Error("No checkout redirect URL returned.");
       }
     } catch (err: any) {
       console.error("Upload/Checkout error:", err);
@@ -211,253 +233,376 @@ export function StudioImageUploader({
   };
 
   return (
-    <Card className="bg-slate-900/60 border-white/10 shadow-2xl w-full max-w-4xl mx-auto rounded-[2.5rem] overflow-hidden backdrop-blur-2xl transition-all duration-300">
-      <CardHeader className="bg-slate-900/80 border-b border-white/10 p-6 sm:p-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-2xl text-slate-100 flex items-center gap-3 font-bold tracking-tight">
-              <div className="h-10 w-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                <UploadCloud className="h-5 w-5" />
-              </div>
-              Neural Upscale & Enhancement Order
-            </CardTitle>
-            <CardDescription className="text-slate-400 text-sm mt-1">
-              Upload your image, choose target fidelity, and configure AI enhancement models.
-            </CardDescription>
-          </div>
-
-          {currentUser ? (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Signed in as <strong className="font-semibold">{currentUser.email}</strong></span>
-            </div>
-          ) : (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300 text-xs font-medium">
-              <Sparkles className="h-3 w-3 text-violet-400" />
-              <span>Instant Guest Mode Active</span>
-            </div>
-          )}
-        </div>
-      </CardHeader>
-
-      <CardContent className="p-6 sm:p-8 space-y-8">
-        {/* ── Full-area clickable dropzone ── */}
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center transition-all duration-300 cursor-pointer relative overflow-hidden group ${
-            isDragActive
-              ? "border-cyan-400 bg-cyan-950/30 shadow-[inset_0_0_60px_rgba(6,182,212,0.15)] scale-[1.01]"
-              : file
-              ? "border-slate-700 bg-slate-950/60"
-              : "border-white/10 bg-slate-950/40 hover:border-cyan-500/40 hover:bg-slate-950/70 shadow-inner"
-          } ${isUploading ? "pointer-events-none opacity-85" : ""}`}
-        >
-          <input {...getInputProps()} />
-
-          <AnimatePresence mode="wait">
-            {previewUrl ? (
-              <motion.div
-                key="preview"
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                className="relative w-full max-h-[420px] flex items-center justify-center"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={previewUrl}
-                  alt="Preview"
-                  className="max-h-[420px] max-w-full rounded-2xl object-contain shadow-2xl border border-white/10"
-                />
-                {!isUploading && (
-                  <button
-                    type="button"
-                    onClick={handleClear}
-                    className="absolute top-4 right-4 bg-slate-950/90 hover:bg-red-500 text-white rounded-full p-2.5 backdrop-blur-md transition-colors shadow-xl z-30 border border-white/10"
-                    title="Remove image"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                )}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="placeholder"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center py-10 pointer-events-none"
-              >
-                <div className="h-20 w-20 bg-slate-900/90 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-slate-800 transition-all duration-300 shadow-2xl border border-white/10 group-hover:border-cyan-500/30">
-                  {isLoadingPricing ? (
-                    <Loader2 className="h-9 w-9 animate-spin text-slate-400" />
-                  ) : (
-                    <ImageIcon className="h-9 w-9 text-slate-400 group-hover:text-cyan-400 transition-colors" />
-                  )}
-                </div>
-                <p className="text-slate-100 font-bold text-lg mb-2 tracking-tight">
-                  {isDragActive ? "Drop image to upscale" : "Click anywhere or drag & drop an image"}
-                </p>
-                <p className="text-xs text-slate-400 font-medium">
-                  Supports High-Res PNG, JPG, WEBP up to 25 MB
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {isUploading && (
-            <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center z-20 rounded-3xl p-6">
-              <Loader2 className="h-12 w-12 text-cyan-400 animate-spin mb-6" />
-              <div className="w-full max-w-xs bg-slate-800/80 rounded-full h-3 mb-3 border border-white/10 overflow-hidden p-0.5 shadow-inner">
-                <div
-                  className="bg-gradient-to-r from-cyan-500 to-violet-500 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_15px_rgba(6,182,212,0.6)]"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-              <span className="text-slate-200 font-semibold text-sm">
-                {uploadProgress < 100 ? `Uploading neural asset (${uploadProgress}%)` : "Redirecting to checkout…"}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* ── Error alert ── */}
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-sm flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 shrink-0" />
-            <span className="font-medium">{error}</span>
-          </div>
-        )}
-
-        {/* ── Guest Contact Email Field (If unauthenticated) ── */}
-        {!currentUser && isCheckedUser && (
-          <div className="p-5 rounded-2xl bg-slate-950/50 border border-white/10 space-y-2">
+    <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* ════════════════ LEFT COLUMN: Workspace & Dropzone ════════════════ */}
+      <div className="lg:col-span-7 space-y-6">
+        <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-white/10 shadow-2xl rounded-[2.5rem] overflow-hidden backdrop-blur-2xl transition-all duration-300">
+          <CardHeader className="p-6 sm:p-7 border-b border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-slate-950/40">
             <div className="flex items-center justify-between">
-              <Label htmlFor="guest-email" className="text-slate-200 font-semibold text-sm flex items-center gap-2">
-                <Mail className="h-4 w-4 text-cyan-400" />
-                Contact Email <span className="text-xs text-slate-400 font-normal">(for receipt & download link)</span>
-              </Label>
-              <span className="text-[10px] text-violet-400 uppercase tracking-wider font-semibold bg-violet-500/10 px-2 py-0.5 rounded-full border border-violet-500/20">
-                No Password Required
-              </span>
-            </div>
-            <Input
-              id="guest-email"
-              type="email"
-              placeholder="name@example.com (optional, for your order link)"
-              value={guestEmail}
-              onChange={(e) => setGuestEmail(e.target.value)}
-              disabled={isUploading}
-              className="h-11 bg-slate-900/80 border-white/10 focus:border-cyan-500 text-white rounded-xl text-sm placeholder:text-slate-500"
-            />
-          </div>
-        )}
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-600 dark:text-cyan-400">
+                  <UploadCloud className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+                    Source Image
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Drag & drop or select an image to upscale
+                  </CardDescription>
+                </div>
+              </div>
 
-        {/* ── Resolution & Enhancement selectors ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-          {/* Resolution */}
-          <div className="space-y-4">
-            <Label className="text-slate-100 font-bold text-base flex items-center gap-2">
-              <span className="bg-cyan-500/20 text-cyan-400 h-6 w-6 rounded-full flex items-center justify-center text-xs font-extrabold">1</span>
-              Target Resolution
-            </Label>
-            <RadioGroup value={selectedTier} onValueChange={setSelectedTier} disabled={isUploading} className="gap-3">
-              {pricingTiers.map((tier) => (
-                <label
-                  key={tier.tier}
-                  htmlFor={`studio-res-${tier.tier}`}
-                  className={`flex items-start space-x-3 border rounded-2xl p-4 transition-all duration-200 cursor-pointer ${
-                    selectedTier === tier.tier
-                      ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.12)]"
-                      : "border-white/10 bg-slate-950/40 hover:bg-slate-900/60 hover:border-slate-700"
+              {previewUrl && !isUploading && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClear}
+                  className="rounded-full text-xs h-8 px-3 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-red-500 hover:border-red-500/30"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1.5" />
+                  Change Image
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-6 sm:p-8">
+            {/* ── Interactive Dropzone / Preview ── */}
+            <div
+              {...getRootProps()}
+              className={`border-2 border-dashed rounded-3xl p-6 sm:p-10 text-center transition-all duration-300 cursor-pointer relative overflow-hidden group ${
+                isDragActive
+                  ? "border-cyan-500 bg-cyan-50 dark:bg-cyan-950/30 shadow-[0_0_40px_rgba(6,182,212,0.2)] scale-[1.01]"
+                  : file
+                  ? "border-slate-300 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-950/50"
+                  : "border-slate-300 dark:border-white/10 bg-slate-50/80 dark:bg-slate-950/30 hover:border-cyan-500/50 hover:bg-cyan-500/5 shadow-inner"
+              } ${isUploading ? "pointer-events-none opacity-85" : ""}`}
+            >
+              <input {...getInputProps()} />
+
+              <AnimatePresence mode="wait">
+                {previewUrl ? (
+                  <motion.div
+                    key="preview"
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    className="relative w-full flex flex-col items-center justify-center"
+                  >
+                    <div className="relative max-h-[380px] max-w-full rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-white/10 group/img">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={previewUrl}
+                        alt="Preview"
+                        className="max-h-[380px] w-auto object-contain rounded-2xl"
+                      />
+                      
+                      {/* Zoom Button Overlay */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setZoomOpen(true);
+                        }}
+                        className="absolute bottom-3 right-3 bg-black/70 hover:bg-cyan-600 text-white p-2 rounded-xl backdrop-blur-md transition-colors opacity-0 group-hover/img:opacity-100 shadow-lg"
+                        title="View Full Size"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {/* Image Metadata Badges */}
+                    {fileMetadata && (
+                      <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+                        <Badge variant="outline" className="bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 text-xs font-mono">
+                          {fileMetadata.width} × {fileMetadata.height} px
+                        </Badge>
+                        <Badge variant="outline" className="bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 text-xs font-mono">
+                          {fileMetadata.size}
+                        </Badge>
+                        <Badge variant="outline" className="bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400 text-xs font-semibold uppercase">
+                          {file?.name.split(".").pop()}
+                        </Badge>
+                      </div>
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="placeholder"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex flex-col items-center justify-center py-12 pointer-events-none"
+                  >
+                    <div className="h-20 w-20 bg-slate-100 dark:bg-slate-900 rounded-3xl flex items-center justify-center mb-5 group-hover:scale-110 group-hover:bg-cyan-500/10 transition-all duration-300 shadow-xl border border-slate-200 dark:border-white/10 group-hover:border-cyan-500/40">
+                      {isLoadingPricing ? (
+                        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                      ) : (
+                        <ImageIcon className="h-8 w-8 text-slate-400 group-hover:text-cyan-500 transition-colors" />
+                      )}
+                    </div>
+                    <p className="text-slate-900 dark:text-slate-100 font-extrabold text-lg mb-1.5 tracking-tight">
+                      {isDragActive ? "Drop your image right here" : "Click to select or drag & drop"}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                      PNG, JPG, or WEBP up to 25 MB
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Uploading Screen Overlay */}
+              {isUploading && (
+                <div className="absolute inset-0 bg-slate-900/90 dark:bg-[#07090E]/95 backdrop-blur-md flex flex-col items-center justify-center z-20 rounded-3xl p-6">
+                  <Loader2 className="h-12 w-12 text-cyan-400 animate-spin mb-6" />
+                  <div className="w-full max-w-xs bg-slate-800 rounded-full h-3 mb-3 border border-white/10 overflow-hidden p-0.5 shadow-inner">
+                    <div
+                      className="bg-gradient-to-r from-cyan-500 to-violet-500 h-full rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(6,182,212,0.6)]"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <span className="text-slate-200 font-semibold text-sm">
+                    {uploadProgress < 100 ? `Securing Asset (${uploadProgress}%)` : "Redirecting to checkout…"}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-3">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Feature Highlights Underneath Dropzone */}
+            <div className="grid grid-cols-3 gap-3 mt-6 pt-6 border-t border-slate-100 dark:border-white/10 text-center">
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-white/5">
+                <div className="text-cyan-600 dark:text-cyan-400 font-bold text-xs">8000px</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Ultra HD Clarity</div>
+              </div>
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-white/5">
+                <div className="text-violet-600 dark:text-violet-400 font-bold text-xs">Zero Loss</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Neural Denoising</div>
+              </div>
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/60 dark:border-white/5">
+                <div className="text-emerald-600 dark:text-emerald-400 font-bold text-xs">100% Mine</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Commercial Rights</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ════════════════ RIGHT COLUMN: Configuration & Order Summary ════════════════ */}
+      <div className="lg:col-span-5 space-y-6">
+        <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-white/10 shadow-2xl rounded-[2.5rem] overflow-hidden backdrop-blur-2xl transition-all duration-300">
+          <CardHeader className="p-6 border-b border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-slate-950/40">
+            <CardTitle className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center justify-between">
+              <span className="flex items-center gap-2.5">
+                <Sliders className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                Enhancement Setup
+              </span>
+              <Badge variant="outline" className="text-[10px] uppercase font-mono border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-950 text-slate-600 dark:text-slate-400">
+                Step by Step
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent className="p-6 space-y-6">
+            {/* ── STEP 1: Resolution Tier Selector ── */}
+            <div className="space-y-3">
+              <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <span className="h-5 w-5 rounded-full bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 flex items-center justify-center text-[10px] font-black">1</span>
+                Select Target Resolution
+              </Label>
+
+              <div className="space-y-2.5">
+                {pricingTiers.map((tier) => {
+                  const isSelected = selectedTier === tier.tier;
+                  return (
+                    <div
+                      key={tier.tier}
+                      onClick={() => !isUploading && setSelectedTier(tier.tier)}
+                      className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer relative ${
+                        isSelected
+                          ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.12)]"
+                          : "border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900/80"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                            isSelected ? "border-cyan-500 bg-cyan-500 text-white" : "border-slate-400 dark:border-slate-600"
+                          }`}>
+                            {isSelected && <Check className="h-3 w-3" />}
+                          </div>
+                          <div>
+                            <div className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                              {tier.label}
+                              {tier.tier === "4k" && (
+                                <span className="bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                  Most Popular
+                                </span>
+                              )}
+                              {tier.tier === "8k" && (
+                                <span className="bg-violet-500/20 text-violet-600 dark:text-violet-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                  Max Clarity
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                              {tier.description}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="font-mono font-extrabold text-sm text-cyan-600 dark:text-cyan-400">
+                            {isLoadingPricing ? <Loader2 className="h-4 w-4 animate-spin inline" /> : tier.formattedPrice}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── STEP 2: Enhancement Mode Toggle ── */}
+            <div className="space-y-3">
+              <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <span className="h-5 w-5 rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-400 flex items-center justify-center text-[10px] font-black">2</span>
+                AI Enhancement Engine
+              </Label>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => !isUploading && setEnhancementType("general")}
+                  className={`p-3.5 rounded-2xl border text-left transition-all ${
+                    enhancementType === "general"
+                      ? "border-violet-500 bg-violet-500/10 shadow-[0_0_15px_rgba(139,92,246,0.15)]"
+                      : "border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900"
                   }`}
                 >
-                  <RadioGroupItem value={tier.tier} id={`studio-res-${tier.tier}`} className="border-slate-500 text-cyan-500 mt-1" />
-                  <div className="flex-1 w-full">
-                    <div className="font-bold text-slate-100 flex items-center justify-between w-full text-sm sm:text-base">
-                      <span>{tier.label}</span>
-                      <span className="text-cyan-400 font-extrabold">
-                        {isLoadingPricing ? <Loader2 className="h-4 w-4 animate-spin inline" /> : tier.formattedPrice}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1">{tier.description}</p>
+                  <div className="font-bold text-xs text-slate-900 dark:text-slate-100">Universal Super-Res</div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Artwork, Text, Graphic, Nature</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => !isUploading && setEnhancementType("face")}
+                  className={`p-3.5 rounded-2xl border text-left transition-all ${
+                    enhancementType === "face"
+                      ? "border-violet-500 bg-violet-500/10 shadow-[0_0_15px_rgba(139,92,246,0.15)]"
+                      : "border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900"
+                  }`}
+                >
+                  <div className="font-bold text-xs text-slate-900 dark:text-slate-100">Face & Portrait Restore</div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Facial Generative Detailing</div>
+                </button>
+              </div>
+            </div>
+
+            {/* ── STEP 3: User/Guest Email Section ── */}
+            <div className="pt-2 border-t border-slate-100 dark:border-white/10 space-y-2.5">
+              {currentUser ? (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-400">
+                  <div className="flex items-center gap-2 truncate">
+                    <UserCheck className="h-4 w-4 shrink-0" />
+                    <span className="truncate">Receiving render as <strong className="font-semibold">{currentUser.email}</strong></span>
                   </div>
-                </label>
-              ))}
-            </RadioGroup>
-          </div>
-
-          {/* Enhancement Type */}
-          <div className="space-y-4">
-            <Label className="text-slate-100 font-bold text-base flex items-center gap-2">
-              <span className="bg-violet-500/20 text-violet-400 h-6 w-6 rounded-full flex items-center justify-center text-xs font-extrabold">2</span>
-              Neural Processing Mode
-            </Label>
-            <RadioGroup value={enhancementType} onValueChange={setEnhancementType} disabled={isUploading} className="gap-3">
-              <label
-                htmlFor="studio-type-general"
-                className={`flex items-start space-x-3 border rounded-2xl p-4 transition-all duration-200 cursor-pointer ${
-                  enhancementType === "general"
-                    ? "border-violet-500 bg-violet-500/10 shadow-[0_0_20px_rgba(139,92,246,0.12)]"
-                    : "border-white/10 bg-slate-950/40 hover:bg-slate-900/60 hover:border-slate-700"
-                }`}
-              >
-                <RadioGroupItem value="general" id="studio-type-general" className="border-slate-500 text-violet-500 mt-1" />
-                <div className="flex-1">
-                  <div className="font-bold text-slate-100 text-sm sm:text-base">Universal Super-Resolution</div>
-                  <p className="text-xs text-slate-400 mt-1">Noise reduction, text clarity, landscape & anime sharpening.</p>
+                  <span className="text-[10px] bg-emerald-500/20 px-2 py-0.5 rounded-full font-bold">Linked</span>
                 </div>
-              </label>
-
-              <label
-                htmlFor="studio-type-face"
-                className={`flex items-start space-x-3 border rounded-2xl p-4 transition-all duration-200 cursor-pointer ${
-                  enhancementType === "face"
-                    ? "border-violet-500 bg-violet-500/10 shadow-[0_0_20px_rgba(139,92,246,0.12)]"
-                    : "border-white/10 bg-slate-950/40 hover:bg-slate-900/60 hover:border-slate-700"
-                }`}
-              >
-                <RadioGroupItem value="face" id="studio-type-face" className="border-slate-500 text-violet-500 mt-1" />
-                <div className="flex-1">
-                  <div className="font-bold text-slate-100 text-sm sm:text-base">Portrait & Face Detail Recovery</div>
-                  <p className="text-xs text-slate-400 mt-1">Specialized facial generative models for skin, eyes, and hair.</p>
+              ) : isCheckedUser ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="studio-guest-email" className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
+                      Contact Email <span className="text-[10px] text-slate-400 font-normal">(Receipt & Download Link)</span>
+                    </Label>
+                    <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-500/10 px-2 py-0.5 rounded-full">
+                      No Password
+                    </span>
+                  </div>
+                  <Input
+                    id="studio-guest-email"
+                    type="email"
+                    placeholder="name@example.com (optional)"
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    disabled={isUploading}
+                    className="h-10 bg-slate-50 dark:bg-slate-950/80 border-slate-200 dark:border-white/10 text-xs rounded-xl"
+                  />
                 </div>
-              </label>
-            </RadioGroup>
-          </div>
-        </div>
-      </CardContent>
+              ) : null}
+            </div>
 
-      <CardFooter className="bg-slate-950/80 p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-center border-t border-white/10 gap-6">
-        <div className="text-center sm:text-left">
-          <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">Total Investment</div>
-          <div className="font-black text-white text-3xl sm:text-4xl tracking-tight">
-            {isLoadingPricing ? (
-              <Loader2 className="h-7 w-7 animate-spin inline-block mt-1" />
-            ) : (
-              activePricing.formattedPrice
-            )}
-          </div>
-        </div>
-        <Button
-          onClick={handleUploadAndCheckout}
-          disabled={!file || isUploading || isLoadingPricing}
-          className="w-full sm:w-auto bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white h-14 px-10 text-base font-bold rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.3)] hover:shadow-[0_0_35px_rgba(6,182,212,0.5)] transition-all duration-300 flex items-center justify-center gap-3 disabled:opacity-50 group"
-        >
-          {isUploading ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Processing Order…
-            </>
-          ) : (
-            <>
-              <CreditCard className="h-5 w-5 group-hover:scale-110 transition-transform" />
-              Proceed to Secure Checkout
-              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-            </>
+            {/* ── Dynamic Order Total & Checkout CTA ── */}
+            <div className="pt-4 border-t border-slate-100 dark:border-white/10 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Order Total
+                </span>
+                <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
+                  {isLoadingPricing ? <Loader2 className="h-5 w-5 animate-spin" /> : activePricing.formattedPrice}
+                </span>
+              </div>
+
+              <Button
+                onClick={handleUploadAndCheckout}
+                disabled={!file || isUploading || isLoadingPricing}
+                className="w-full h-13 py-3.5 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white rounded-2xl font-extrabold text-sm shadow-[0_0_25px_rgba(6,182,212,0.3)] hover:shadow-[0_0_35px_rgba(6,182,212,0.45)] transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 group"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Processing Order…
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="h-4 w-4 group-hover:scale-110 transition-transform" />
+                    Proceed to Instant Checkout
+                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </Button>
+
+              <div className="flex items-center justify-center gap-4 text-[11px] text-slate-500 dark:text-slate-400 pt-1">
+                <div className="flex items-center gap-1">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>Stripe Protected</span>
+                </div>
+                <span>•</span>
+                <div className="flex items-center gap-1">
+                  <Lock className="h-3.5 w-3.5 text-cyan-500" />
+                  <span>256-bit SSL</span>
+                </div>
+                <span>•</span>
+                <div className="flex items-center gap-1">
+                  <Zap className="h-3.5 w-3.5 text-violet-500" />
+                  <span>Instant Delivery</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Zoom Preview Modal ── */}
+      <Dialog open={zoomOpen} onOpenChange={setZoomOpen}>
+        <DialogContent className="max-w-4xl bg-white/95 dark:bg-[#07090E]/95 border-slate-200 dark:border-white/10 p-4 rounded-3xl backdrop-blur-2xl">
+          {previewUrl && (
+            <div className="flex items-center justify-center max-h-[80vh] overflow-hidden rounded-2xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={previewUrl} alt="Zoom Preview" className="max-h-[80vh] w-auto object-contain rounded-2xl" />
+            </div>
           )}
-        </Button>
-      </CardFooter>
-    </Card>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

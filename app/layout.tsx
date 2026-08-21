@@ -19,12 +19,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.className} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 dark:bg-[#080c14] dark:text-slate-100 transition-colors duration-300">
+      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 dark:bg-[#07090E] dark:text-slate-100 transition-colors duration-300">
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-          disableTransitionOnChange={false}
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
         >
           {children}
         </ThemeProvider>

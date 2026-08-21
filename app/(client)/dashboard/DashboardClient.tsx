@@ -3,13 +3,14 @@
 import React, { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ImageUploader } from "@/components/dashboard/image-uploader";
-import { History, Download, Shield, LogOut, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon, PartyPopper, RefreshCw, Sparkles, User, ExternalLink } from "lucide-react";
+import { History, Download, Shield, LogOut, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon, PartyPopper, RefreshCw, Sparkles, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import confetti from "canvas-confetti";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 
 interface Order {
   id: string;
@@ -134,10 +135,10 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'completed': return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/40 text-xs font-semibold"><CheckCircle2 className="h-3 w-3 mr-1" /> Completed</Badge>;
-      case 'processing': return <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/40 text-xs font-semibold"><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Processing</Badge>;
-      case 'failed': return <Badge variant="destructive" className="bg-red-500/20 text-red-400 border-red-500/40 text-xs font-semibold"><AlertCircle className="h-3 w-3 mr-1" /> Failed</Badge>;
-      default: return <Badge variant="outline" className="text-amber-400 border-amber-500/40 bg-amber-500/10 text-xs font-semibold">Pending</Badge>;
+      case 'completed': return <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-xs font-semibold"><CheckCircle2 className="h-3 w-3 mr-1" /> Completed</Badge>;
+      case 'processing': return <Badge className="bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30 text-xs font-semibold"><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Processing</Badge>;
+      case 'failed': return <Badge variant="destructive" className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30 text-xs font-semibold"><AlertCircle className="h-3 w-3 mr-1" /> Failed</Badge>;
+      default: return <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10 text-xs font-semibold">Pending</Badge>;
     }
   };
 
@@ -172,46 +173,48 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
   };
 
   return (
-    <div className="min-h-screen bg-[#07090E] text-slate-50 font-sans selection:bg-cyan-900/50 flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#07090E] dark:text-slate-50 font-sans selection:bg-cyan-500/30 flex flex-col relative overflow-hidden transition-colors duration-200">
       {/* Background Ambient Lighting */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] rounded-full bg-cyan-600/12 blur-[140px]" />
-        <div className="absolute bottom-[-15%] right-[-10%] w-[50%] h-[50%] rounded-full bg-violet-600/12 blur-[140px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff08_1px,transparent_1px)] [background-size:24px_24px] opacity-35" />
+        <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] rounded-full bg-cyan-500/10 dark:bg-cyan-600/12 blur-[140px]" />
+        <div className="absolute bottom-[-15%] right-[-10%] w-[50%] h-[50%] rounded-full bg-violet-500/10 dark:bg-violet-600/12 blur-[140px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(#00000008_1px,transparent_1px)] dark:bg-[radial-gradient(#ffffff08_1px,transparent_1px)] [background-size:24px_24px] opacity-50" />
       </div>
 
       {/* Header */}
-      <header className="border-b border-white/10 bg-slate-950/70 backdrop-blur-xl sticky top-0 z-50">
+      <header className="border-b border-slate-200 dark:border-white/10 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl sticky top-0 z-50 transition-colors duration-200">
         <div className="container max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-600 p-[1px] shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-all">
-                <div className="h-full w-full bg-[#07090E] rounded-[10px] flex items-center justify-center">
-                  <Sparkles className="h-4 w-4 text-cyan-400" />
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-600 p-[1px] shadow-md shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-all">
+                <div className="h-full w-full bg-white dark:bg-[#07090E] rounded-[10px] flex items-center justify-center">
+                  <Sparkles className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
                 </div>
               </div>
-              <span className="font-extrabold text-lg tracking-tight text-slate-100 hidden sm:block">
-                PixelRes <span className="bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">Workspace</span>
+              <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-slate-100 hidden sm:block">
+                PixelRes <span className="bg-gradient-to-r from-cyan-500 to-violet-500 bg-clip-text text-transparent">Workspace</span>
               </span>
             </Link>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/60 border border-white/10 text-xs text-slate-300">
-              <User className="h-3.5 w-3.5 text-cyan-400" />
+            <ThemeToggle />
+
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-white/10 text-xs text-slate-700 dark:text-slate-300">
+              <User className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
               <span>{user.email}</span>
             </div>
             <Link href="/studio">
-              <Button size="sm" variant="ghost" className="text-slate-300 hover:text-white text-xs font-semibold">
+              <Button size="sm" variant="ghost" className="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-semibold">
                 Studio
               </Button>
             </Link>
             <Link href="/admin">
-              <Button size="sm" variant="ghost" className="text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1">
-                <Shield className="h-3.5 w-3.5 text-violet-400" /> Admin
+              <Button size="sm" variant="ghost" className="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-semibold flex items-center gap-1">
+                <Shield className="h-3.5 w-3.5 text-violet-500" /> Admin
               </Button>
             </Link>
-            <Button size="sm" variant="outline" onClick={handleLogout} className="border-white/10 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-semibold">
+            <Button size="sm" variant="outline" onClick={handleLogout} className="border-slate-200 dark:border-white/10 bg-white/80 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold shadow-sm">
               <LogOut className="h-3.5 w-3.5 mr-1.5" /> Sign Out
             </Button>
           </div>
@@ -221,7 +224,7 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
       {/* Payment Success Banner */}
       {searchParams.get('payment') === 'success' && (
         <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-4 py-3 text-center z-10 backdrop-blur-md">
-          <p className="text-emerald-400 font-semibold text-sm flex items-center justify-center gap-2">
+          <p className="text-emerald-700 dark:text-emerald-400 font-semibold text-sm flex items-center justify-center gap-2">
             <PartyPopper className="h-4 w-4" />
             Payment confirmed! Your neural upscale is currently processing.
           </p>
@@ -237,11 +240,11 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
 
         {/* Right Column: Order History */}
         <div className="xl:col-span-5 space-y-6">
-          <Card className="bg-slate-900/60 border-white/10 backdrop-blur-2xl rounded-[2rem] h-full flex flex-col shadow-2xl overflow-hidden">
-            <CardHeader className="p-6 border-b border-white/10">
-              <CardTitle className="flex items-center justify-between text-lg text-slate-100 font-bold">
+          <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-white/10 backdrop-blur-2xl rounded-[2.5rem] h-full flex flex-col shadow-2xl overflow-hidden transition-all">
+            <CardHeader className="p-6 border-b border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-slate-950/40">
+              <CardTitle className="flex items-center justify-between text-lg text-slate-900 dark:text-slate-100 font-bold">
                 <span className="flex items-center gap-2">
-                  <History className="h-5 w-5 text-cyan-400" /> Recent Enhancements
+                  <History className="h-5 w-5 text-cyan-600 dark:text-cyan-400" /> Recent Enhancements
                 </span>
                 <div className="flex items-center gap-2">
                   <Button
@@ -249,35 +252,35 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
                     variant="ghost"
                     onClick={() => fetchFreshOrders()}
                     disabled={isRefreshing}
-                    className="h-8 px-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl"
+                    className="h-8 px-2.5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded-xl"
                     title="Refresh Orders"
                   >
-                    <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
+                    <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-cyan-500' : ''}`} />
                   </Button>
-                  <Badge variant="outline" className="text-xs border-white/10 bg-slate-950/60 text-slate-300 font-mono">
+                  <Badge variant="outline" className="text-xs border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-950/60 text-slate-700 dark:text-slate-300 font-mono">
                     {orders.length} Orders
                   </Badge>
                 </div>
               </CardTitle>
-              <CardDescription className="text-slate-400 text-xs">
+              <CardDescription className="text-slate-500 dark:text-slate-400 text-xs">
                 Track live status and download your completed upscaled renders.
               </CardDescription>
             </CardHeader>
 
             <CardContent className="flex-1 p-6 space-y-4 overflow-y-auto max-h-[620px] pr-2 custom-scrollbar">
               {orders.length === 0 ? (
-                <div className="text-center py-16 px-4 border border-dashed border-white/10 rounded-2xl bg-slate-950/40">
-                  <ImageIcon className="h-10 w-10 text-slate-600 mx-auto mb-3" />
-                  <p className="text-slate-300 text-sm font-semibold">No enhancement orders yet.</p>
+                <div className="text-center py-16 px-4 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50/60 dark:bg-slate-950/40">
+                  <ImageIcon className="h-10 w-10 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-800 dark:text-slate-300 text-sm font-semibold">No enhancement orders yet.</p>
                   <p className="text-slate-500 text-xs mt-1">Upload an image on the left to start upscaling.</p>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => fetchFreshOrders()}
                     disabled={isRefreshing}
-                    className="mt-4 border-white/10 text-slate-300 hover:bg-slate-800 text-xs rounded-xl"
+                    className="mt-4 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 text-xs rounded-xl"
                   >
-                    <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
+                    <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRefreshing ? 'animate-spin text-cyan-500' : ''}`} />
                     Refresh Orders
                   </Button>
                 </div>
@@ -285,12 +288,12 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
                 orders.map((order) => (
                   <div
                     key={order.id}
-                    className="p-4 rounded-2xl border border-white/10 bg-slate-950/60 hover:bg-slate-950/90 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group shadow-sm"
+                    className="p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-slate-950/60 hover:bg-slate-100 dark:hover:bg-slate-950/90 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group shadow-sm"
                   >
                     <div className="flex items-center gap-3 w-full sm:w-auto">
                       {/* Thumbnail */}
                       <div 
-                        className="h-14 w-14 rounded-xl bg-slate-800 border border-white/10 overflow-hidden relative flex-shrink-0 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-cyan-500/50 transition-all"
+                        className="h-14 w-14 rounded-xl bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-white/10 overflow-hidden relative flex-shrink-0 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-cyan-500/50 transition-all"
                         onClick={() => loadThumbnail(order.id, order.original_image_url)}
                         title="Click to load preview"
                       >
@@ -298,21 +301,21 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={thumbnails[order.id]} alt="preview" className="w-full h-full object-cover" />
                         ) : (
-                          <ImageIcon className="h-5 w-5 text-slate-500 group-hover:text-slate-400" />
+                          <ImageIcon className="h-5 w-5 text-slate-400 dark:text-slate-500" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-xs text-slate-200 flex items-center gap-2 truncate">
+                        <div className="font-semibold text-xs text-slate-800 dark:text-slate-200 flex items-center gap-2 truncate">
                           Order {order.id.substring(0, 8)}
                         </div>
-                        <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-2 mt-1">
-                          <span className="text-cyan-400 font-mono uppercase bg-cyan-950/50 px-1.5 py-0.5 rounded border border-cyan-500/20">{order.target_resolution}</span>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-2 mt-1">
+                          <span className="text-cyan-600 dark:text-cyan-400 font-mono uppercase bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20">{order.target_resolution}</span>
                           <span>•</span>
                           <span className="capitalize">{order.enhancement_type}</span>
                           <span>•</span>
-                          <span className="text-slate-400 font-mono font-medium">{formatPrice(order.amount_paid, order.currency)}</span>
+                          <span className="font-mono font-medium text-slate-700 dark:text-slate-300">{formatPrice(order.amount_paid, order.currency)}</span>
                         </div>
-                        <div className="text-[10px] text-slate-500 mt-1">{formatDate(order.created_at)}</div>
+                        <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{formatDate(order.created_at)}</div>
                       </div>
                     </div>
 
@@ -322,7 +325,7 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
                       <Button
                         size="icon"
                         variant="ghost"
-                        className={`h-9 w-9 rounded-xl transition-colors ${order.status === 'completed' ? 'text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/80 border border-cyan-500/30' : 'text-slate-600 cursor-not-allowed'}`}
+                        className={`h-9 w-9 rounded-xl transition-colors ${order.status === 'completed' ? 'text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-950/80 border border-cyan-500/30' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'}`}
                         disabled={order.status !== 'completed'}
                         onClick={() => handleDownload(order)}
                         title={order.status === 'completed' ? "Download Output" : "Processing deliverable..."}

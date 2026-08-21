@@ -2,13 +2,13 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { UploadCloud, Image as ImageIcon, X, Loader2, Info, CreditCard } from "lucide-react";
+import { UploadCloud, Image as ImageIcon, X, Loader2, Info, CreditCard, ArrowRight, ShieldCheck, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { getAllPricingTiersDynamic, getAllPricingTiers, ResolutionTier, PricingInfo } from "@/lib/pricing";
+import { getAllPricingTiersDynamic, getAllPricingTiers, PricingInfo } from "@/lib/pricing";
 import { motion, AnimatePresence } from "framer-motion";
 
 export interface ImageUploaderProps {
@@ -95,17 +95,16 @@ export function ImageUploader({
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || 'guest';
+      const userId = user?.id || null;
       const orderId = crypto.randomUUID();
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${userId}/${orderId}.${fileExt}`;
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const storagePath = `${userId || 'guest'}/${orderId}.${fileExt}`;
 
       setUploadProgress(30);
 
-      // Upload file to Supabase Storage via server API (bypasses Storage RLS)
       const uploadFormData = new FormData();
       uploadFormData.append("file", file);
-      uploadFormData.append("path", filePath);
+      uploadFormData.append("path", storagePath);
 
       const uploadRes = await fetch("/api/upload/raw", {
         method: "POST",
@@ -119,32 +118,29 @@ export function ImageUploader({
 
       setUploadProgress(60);
 
-      // Create order via server-side API route (bypasses RLS)
-      const orderResponse = await fetch('/api/orders/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const orderRes = await fetch("/api/orders/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId,
-          userId: user?.id || null,
+          userId,
           customerEmail: user?.email || null,
-          filePath,
+          filePath: storagePath,
           targetResolution: selectedTier,
           enhancementType,
           currency: activePricing.currency,
           amountPaid: activePricing.price,
-
-        })
+        }),
       });
 
-      const orderData = await orderResponse.json();
-      if (!orderResponse.ok) {
-        throw new Error(orderData.error || 'Failed to create order');
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) {
+        throw new Error(orderData.error || "Failed to create order record.");
       }
 
       setUploadProgress(80);
 
-      // Create Stripe checkout session
-      const checkoutResponse = await fetch('/api/checkout', {
+      const checkoutRes = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -154,19 +150,22 @@ export function ImageUploader({
           currency: activePricing.currency,
           amount: activePricing.price,
           customerEmail: user?.email,
-          userId: user?.id
-        })
+          userId: user?.id,
+        }),
       });
 
-      const checkoutData = await checkoutResponse.json();
-
-      if (!checkoutResponse.ok) {
-        throw new Error(checkoutData.error || 'Failed to initialize checkout');
+      const checkoutData = await checkoutRes.json();
+      if (!checkoutRes.ok) {
+        throw new Error(checkoutData.error || 'Failed to initialize checkout.');
       }
 
       setUploadProgress(100);
-      window.location.href = checkoutData.url;
 
+      if (checkoutData.url) {
+        window.location.href = checkoutData.url;
+      } else {
+        throw new Error('No checkout URL returned.');
+      }
     } catch (err: any) {
       console.error("Upload/Checkout error:", err);
       setError(err.message || "An error occurred. Please try again.");
@@ -176,15 +175,15 @@ export function ImageUploader({
   };
 
   return (
-    <Card className="bg-slate-950/40 border-slate-800/80 shadow-2xl w-full max-w-4xl mx-auto rounded-[2rem] overflow-hidden backdrop-blur-md">
-      <CardHeader className="bg-slate-900/40 border-b border-slate-800/50 p-6 sm:p-8">
-        <CardTitle className="text-2xl text-slate-100 flex items-center gap-2 font-bold">
-          <div className="h-10 w-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+    <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-white/10 shadow-2xl w-full max-w-4xl mx-auto rounded-[2.5rem] overflow-hidden backdrop-blur-2xl transition-all">
+      <CardHeader className="bg-slate-50/50 dark:bg-slate-950/40 border-b border-slate-100 dark:border-white/10 p-6 sm:p-8">
+        <CardTitle className="text-2xl text-slate-900 dark:text-slate-100 flex items-center gap-3 font-bold">
+          <div className="h-10 w-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-600 dark:text-cyan-400">
              <UploadCloud className="h-5 w-5" />
           </div>
           New Enhancement Order
         </CardTitle>
-        <CardDescription className="text-slate-400 text-base mt-2">
+        <CardDescription className="text-slate-500 dark:text-slate-400 text-sm mt-1">
           Upload your image and configure the AI enhancement parameters.
         </CardDescription>
       </CardHeader>
@@ -193,22 +192,15 @@ export function ImageUploader({
         {/* Full clickable dropzone */}
         <div
           {...getRootProps()}
-          className={`border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center transition-all duration-300 cursor-pointer relative overflow-hidden group ${
-            isDragActive ? "border-cyan-500 bg-cyan-950/20 shadow-[inset_0_0_50px_rgba(6,182,212,0.1)]" :
-            file ? "border-slate-700 bg-slate-900/50" : "border-slate-700 bg-slate-900/30 hover:border-slate-500 hover:bg-slate-900/50"
+          className={`border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center transition-all duration-300 cursor-pointer relative overflow-hidden group ${
+            isDragActive 
+              ? "border-cyan-500 bg-cyan-50 dark:bg-cyan-950/30 shadow-[0_0_40px_rgba(6,182,212,0.2)] scale-[1.01]" 
+              : file 
+              ? "border-slate-300 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-950/50" 
+              : "border-slate-300 dark:border-white/10 bg-slate-50/80 dark:bg-slate-950/30 hover:border-cyan-500/50 hover:bg-cyan-500/5"
           } ${(isUploading || isLoadingPricing) ? "pointer-events-none opacity-80" : ""}`}
         >
-          {/* Hidden file input rendered by react-dropzone */}
           <input {...getInputProps()} />
-          
-          {/* Invisible overlay to guarantee full clickability */}
-          {!file && !isUploading && (
-            <div 
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-              onClick={(e) => { e.stopPropagation(); open(); }}
-              aria-label="Click to upload file"
-            />
-          )}
 
           <AnimatePresence mode="wait">
             {previewUrl ? (
@@ -220,11 +212,12 @@ export function ImageUploader({
                 className="relative w-full max-h-[400px] flex items-center justify-center"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewUrl} alt="Preview" className="max-h-[400px] max-w-full rounded-xl object-contain shadow-2xl" />
+                <img src={previewUrl} alt="Preview" className="max-h-[400px] max-w-full rounded-2xl object-contain shadow-2xl border border-slate-200 dark:border-white/10" />
                 {!isUploading && (
                   <button
+                    type="button"
                     onClick={handleClear}
-                    className="absolute top-4 right-4 bg-slate-950/80 hover:bg-red-500 text-white rounded-full p-2.5 backdrop-blur-md transition-colors shadow-lg z-30"
+                    className="absolute top-4 right-4 bg-slate-900/80 hover:bg-red-500 text-white rounded-full p-2.5 backdrop-blur-md transition-colors shadow-lg z-30"
                   >
                     <X className="h-5 w-5" />
                   </button>
@@ -236,15 +229,15 @@ export function ImageUploader({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center py-8 relative z-10 pointer-events-none"
+                className="flex flex-col items-center justify-center py-10 pointer-events-none"
               >
-                <div className="h-20 w-20 bg-slate-800/80 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-slate-800 transition-all duration-300 shadow-xl border border-slate-700">
-                  {isLoadingPricing ? <Loader2 className="h-10 w-10 animate-spin text-slate-400" /> : <ImageIcon className="h-10 w-10 text-slate-400 group-hover:text-cyan-400 transition-colors" />}
+                <div className="h-20 w-20 bg-slate-100 dark:bg-slate-900 rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 transition-all duration-300 shadow-xl border border-slate-200 dark:border-white/10">
+                  {isLoadingPricing ? <Loader2 className="h-9 w-9 animate-spin text-slate-400" /> : <ImageIcon className="h-9 w-9 text-slate-400 group-hover:text-cyan-500 transition-colors" />}
                 </div>
-                <p className="text-slate-200 font-semibold text-lg mb-2">
-                  {isLoadingPricing ? "Loading pricing configurations..." : isDragActive ? "Drop the image here" : "Drag & drop an image, or click to browse"}
+                <p className="text-slate-900 dark:text-slate-100 font-extrabold text-lg mb-2">
+                  {isLoadingPricing ? "Loading configurations..." : isDragActive ? "Drop the image here" : "Click anywhere or drag & drop an image"}
                 </p>
-                <p className="text-sm text-slate-500 font-medium">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                   Supports PNG, JPG, WEBP up to 25MB
                 </p>
               </motion.div>
@@ -252,70 +245,90 @@ export function ImageUploader({
           </AnimatePresence>
 
           {isUploading && (
-            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center z-10 rounded-2xl">
+            <div className="absolute inset-0 bg-slate-900/90 dark:bg-[#07090E]/95 backdrop-blur-md flex flex-col items-center justify-center z-20 rounded-3xl p-6">
               <Loader2 className="h-12 w-12 text-cyan-400 animate-spin mb-6" />
-              <div className="w-72 bg-slate-800/50 rounded-full h-3 mb-3 border border-slate-700/50 overflow-hidden p-0.5">
-                <div className="bg-gradient-to-r from-cyan-600 to-cyan-400 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(6,182,212,0.5)]" style={{ width: `${uploadProgress}%` }}></div>
+              <div className="w-full max-w-xs bg-slate-800 rounded-full h-3 mb-3 border border-white/10 overflow-hidden p-0.5">
+                <div className="bg-gradient-to-r from-cyan-500 to-violet-500 h-full rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(6,182,212,0.6)]" style={{ width: `${uploadProgress}%` }}></div>
               </div>
-              <span className="text-cyan-100 font-medium text-lg">{uploadProgress < 100 ? `${uploadProgress}%` : "Redirecting to checkout..."}</span>
+              <span className="text-slate-200 font-semibold text-sm">{uploadProgress < 100 ? `Uploading (${uploadProgress}%)` : "Redirecting to checkout…"}</span>
             </div>
           )}
         </div>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm flex items-center gap-3">
-            <Info className="h-5 w-5 shrink-0" />
-            {error}
+          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-3">
+            <Info className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-          <div className="space-y-5">
-            <Label className="text-slate-100 font-bold text-lg flex items-center gap-2">
-              <span className="bg-cyan-500/20 text-cyan-400 h-6 w-6 rounded-full flex items-center justify-center text-xs">1</span>
-              Output Resolution
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          {/* Resolution selector */}
+          <div className="space-y-4">
+            <Label className="text-slate-900 dark:text-slate-100 font-bold text-base flex items-center gap-2">
+              <span className="bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 h-6 w-6 rounded-full flex items-center justify-center text-xs font-black">1</span>
+              Target Resolution
             </Label>
             <RadioGroup value={selectedTier} onValueChange={setSelectedTier} disabled={isUploading || isLoadingPricing} className="gap-3">
               {pricingTiers.map((tier) => (
-                <div key={tier.tier} className={`flex items-start space-x-3 border rounded-xl p-4 transition-all duration-200 ${selectedTier === tier.tier ? 'border-cyan-500 bg-cyan-500/5 shadow-[0_0_15px_rgba(6,182,212,0.1)]' : 'border-slate-800 bg-slate-900/40 hover:bg-slate-900/80 hover:border-slate-700'}`}>
-                  <RadioGroupItem value={tier.tier} id={`res-${tier.tier}`} className="border-slate-500 text-cyan-500 mt-0.5" />
-                  <div className="flex-1 cursor-pointer w-full">
-                    <Label htmlFor={`res-${tier.tier}`} className="cursor-pointer font-bold text-slate-200 flex items-center justify-between w-full text-base">
+                <div
+                  key={tier.tier}
+                  onClick={() => setSelectedTier(tier.tier)}
+                  className={`flex items-start space-x-3 border rounded-2xl p-4 transition-all duration-200 cursor-pointer ${
+                    selectedTier === tier.tier
+                      ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.12)]"
+                      : "border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900"
+                  }`}
+                >
+                  <RadioGroupItem value={tier.tier} id={`dash-res-${tier.tier}`} className="border-slate-400 dark:border-slate-600 text-cyan-500 mt-1" />
+                  <div className="flex-1 w-full">
+                    <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between w-full text-sm sm:text-base">
                       <span>{tier.label}</span>
-                      <span className="text-cyan-400">
+                      <span className="text-cyan-600 dark:text-cyan-400 font-mono font-extrabold">
                         {isLoadingPricing ? <Loader2 className="h-4 w-4 animate-spin inline" /> : tier.formattedPrice}
                       </span>
-                    </Label>
-                    <p className="text-sm text-slate-500 mt-1">{tier.description}</p>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{tier.description}</p>
                   </div>
                 </div>
               ))}
             </RadioGroup>
           </div>
 
-          <div className="space-y-5">
-            <Label className="text-slate-100 font-bold text-lg flex items-center gap-2">
-              <span className="bg-violet-500/20 text-violet-400 h-6 w-6 rounded-full flex items-center justify-center text-xs">2</span>
+          {/* Enhancement selector */}
+          <div className="space-y-4">
+            <Label className="text-slate-900 dark:text-slate-100 font-bold text-base flex items-center gap-2">
+              <span className="bg-violet-500/20 text-violet-600 dark:text-violet-400 h-6 w-6 rounded-full flex items-center justify-center text-xs font-black">2</span>
               Enhancement Type
             </Label>
             <RadioGroup value={enhancementType} onValueChange={setEnhancementType} disabled={isUploading} className="gap-3">
-              <div className={`flex items-start space-x-3 border rounded-xl p-4 transition-all duration-200 ${enhancementType === 'general' ? 'border-violet-500 bg-violet-500/5 shadow-[0_0_15px_rgba(139,92,246,0.1)]' : 'border-slate-800 bg-slate-900/40 hover:bg-slate-900/80 hover:border-slate-700'}`}>
-                <RadioGroupItem value="general" id="type-general" className="border-slate-500 text-violet-500 mt-0.5" />
-                <div className="flex-1 cursor-pointer">
-                  <Label htmlFor="type-general" className="cursor-pointer font-bold text-slate-200 text-base">
-                    General Upscale / Denoiser
-                  </Label>
-                  <p className="text-sm text-slate-500 mt-1">Best for landscapes, anime, and general photography.</p>
+              <div
+                onClick={() => setEnhancementType("general")}
+                className={`flex items-start space-x-3 border rounded-2xl p-4 transition-all duration-200 cursor-pointer ${
+                  enhancementType === "general"
+                    ? "border-violet-500 bg-violet-500/10 shadow-[0_0_20px_rgba(139,92,246,0.12)]"
+                    : "border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900"
+                }`}
+              >
+                <RadioGroupItem value="general" id="dash-type-general" className="border-slate-400 dark:border-slate-600 text-violet-500 mt-1" />
+                <div className="flex-1">
+                  <div className="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base">Universal Super-Res</div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Noise reduction, artwork, text, and general photos.</p>
                 </div>
               </div>
 
-              <div className={`flex items-start space-x-3 border rounded-xl p-4 transition-all duration-200 ${enhancementType === 'face' ? 'border-violet-500 bg-violet-500/5 shadow-[0_0_15px_rgba(139,92,246,0.1)]' : 'border-slate-800 bg-slate-900/40 hover:bg-slate-900/80 hover:border-slate-700'}`}>
-                <RadioGroupItem value="face" id="type-face" className="border-slate-500 text-violet-500 mt-0.5" />
-                <div className="flex-1 cursor-pointer">
-                  <Label htmlFor="type-face" className="cursor-pointer font-bold text-slate-200 text-base">
-                    Face / Portrait Restoration
-                  </Label>
-                  <p className="text-sm text-slate-500 mt-1">Specialized models to recover facial details and eyes.</p>
+              <div
+                onClick={() => setEnhancementType("face")}
+                className={`flex items-start space-x-3 border rounded-2xl p-4 transition-all duration-200 cursor-pointer ${
+                  enhancementType === "face"
+                    ? "border-violet-500 bg-violet-500/10 shadow-[0_0_20px_rgba(139,92,246,0.12)]"
+                    : "border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900"
+                }`}
+              >
+                <RadioGroupItem value="face" id="dash-type-face" className="border-slate-400 dark:border-slate-600 text-violet-500 mt-1" />
+                <div className="flex-1">
+                  <div className="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base">Face / Portrait Restoration</div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Generative restoration for eyes, skin, and hair.</p>
                 </div>
               </div>
             </RadioGroup>
@@ -323,27 +336,28 @@ export function ImageUploader({
         </div>
       </CardContent>
 
-      <CardFooter className="bg-slate-900/60 p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-center border-t border-slate-800/50 gap-6">
+      <CardFooter className="bg-slate-50/50 dark:bg-slate-950/60 p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-center border-t border-slate-100 dark:border-white/10 gap-6">
         <div className="text-center sm:text-left">
-          <div className="text-sm text-slate-400 font-medium">Total Cost</div>
-          <div className="font-extrabold text-white text-3xl">
-            {isLoadingPricing ? <Loader2 className="h-6 w-6 animate-spin inline-block mt-1" /> : activePricing.formattedPrice}
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">Total Investment</div>
+          <div className="font-black text-slate-900 dark:text-white text-3xl sm:text-4xl">
+            {isLoadingPricing ? <Loader2 className="h-7 w-7 animate-spin inline-block mt-1" /> : activePricing.formattedPrice}
           </div>
         </div>
         <Button
           onClick={handleUploadAndCheckout}
           disabled={!file || isUploading || isLoadingPricing}
-          className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-500 text-white h-14 px-8 text-lg font-semibold rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] transition-all flex items-center justify-center gap-3"
+          className="w-full sm:w-auto bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white h-14 px-10 text-base font-bold rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.3)] hover:shadow-[0_0_35px_rgba(6,182,212,0.5)] transition-all flex items-center justify-center gap-3 disabled:opacity-50 group"
         >
           {isUploading ? (
              <>
                <Loader2 className="h-5 w-5 animate-spin" />
-               Processing...
+               Processing Order…
              </>
           ) : (
              <>
-               <CreditCard className="h-5 w-5" />
+               <CreditCard className="h-5 w-5 group-hover:scale-110 transition-transform" />
                Proceed to Checkout
+               <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
              </>
           )}
         </Button>
