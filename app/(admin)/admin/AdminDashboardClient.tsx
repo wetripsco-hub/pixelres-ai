@@ -203,15 +203,16 @@ export function AdminDashboardClient({
         body: JSON.stringify({ tiers: pricing }),
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to update pricing settings");
+        throw new Error(data?.error || `Failed to update pricing settings (Status ${res.status})`);
       }
 
       setPricingMessage({ type: "success", text: "Multi-currency rates successfully updated!" });
       setTimeout(() => setPricingMessage(null), 4000);
     } catch (error: any) {
-      setPricingMessage({ type: "error", text: error.message });
+      setPricingMessage({ type: "error", text: error.message || "Failed to update pricing." });
     } finally {
       setIsSavingPricing(false);
     }
