@@ -28,7 +28,7 @@ export const RESOLUTION_TIERS = {
   },
 };
 
-// Fallback pricing used when Supabase is unreachable
+// Fallback pricing used when Supabase or API is unreachable
 const FALLBACK_PRICING_DATA: Record<CurrencyCode, Record<ResolutionTier, number>> = {
   USD: {
     web: 1.99,
@@ -85,55 +85,44 @@ export function getAllPricingTiers(countryCode: string = 'US'): PricingInfo[] {
   ];
 }
 
-// ── Dynamic (Supabase-backed) ────────────────────────────────────────
+// ── Dynamic Pricing Fetcher ────────────────────────────────────────
 
 export async function fetchDynamicPricing(): Promise<Record<CurrencyCode, Record<ResolutionTier, number>>> {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    // Try internal /api/admin/pricing endpoint
+    const baseUrl = typeof window !== 'undefined'
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-    if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')) {
-      return FALLBACK_PRICING_DATA;
-    }
+    const res = await fetch(`${baseUrl}/api/admin/pricing`, {
+      cache: 'no-store',
+    }).catch(() => null);
 
-    const res = await fetch(
-      `${supabaseUrl}/rest/v1/pricing_settings?select=id,usd_price,pkr_price,inr_price`,
-      {
-        headers: {
-          apikey: supabaseAnonKey,
-          Authorization: `Bearer ${supabaseAnonKey}`,
-        },
-        cache: 'no-store',
-      }
-    );
+    if (res && res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data && Array.isArray(data.tiers) && data.tiers.length > 0) {
+        const result: Record<CurrencyCode, Record<ResolutionTier, number>> = {
+          USD: { web: 0, '4k': 0, '8k': 0 },
+          PKR: { web: 0, '4k': 0, '8k': 0 },
+          INR: { web: 0, '4k': 0, '8k': 0 },
+        };
 
-    if (!res.ok) return FALLBACK_PRICING_DATA;
+        for (const row of data.tiers) {
+          const tier = row.id as ResolutionTier;
+          if (tier === 'web' || tier === '4k' || tier === '8k') {
+            result.USD[tier] = Number(row.usd_price);
+            result.PKR[tier] = Number(row.pkr_price);
+            result.INR[tier] = Number(row.inr_price);
+          }
+        }
 
-    const rows: { id: string; usd_price: number; pkr_price: number; inr_price: number }[] = await res.json();
-
-    if (!rows || rows.length === 0) return FALLBACK_PRICING_DATA;
-
-    const result: Record<CurrencyCode, Record<ResolutionTier, number>> = {
-      USD: { web: 0, '4k': 0, '8k': 0 },
-      PKR: { web: 0, '4k': 0, '8k': 0 },
-      INR: { web: 0, '4k': 0, '8k': 0 },
-    };
-
-    for (const row of rows) {
-      const tier = row.id as ResolutionTier;
-      if (tier === 'web' || tier === '4k' || tier === '8k') {
-        result.USD[tier] = Number(row.usd_price);
-        result.PKR[tier] = Number(row.pkr_price);
-        result.INR[tier] = Number(row.inr_price);
+        if (result.USD.web > 0 || result.USD['4k'] > 0 || result.USD['8k'] > 0) {
+          return result;
+        }
       }
     }
 
-    // Validate that at least one price is populated
-    if (result.USD.web === 0 && result.USD['4k'] === 0 && result.USD['8k'] === 0) {
-      return FALLBACK_PRICING_DATA;
-    }
-
-    return result;
+    return FALLBACK_PRICING_DATA;
   } catch {
     return FALLBACK_PRICING_DATA;
   }
@@ -145,7 +134,7 @@ export async function getAllPricingTiersDynamic(countryCode: string = 'US'): Pro
 
   const tiers: ResolutionTier[] = ['web', '4k', '8k'];
   return tiers.map((tier) => {
-    const price = pricingData[currency][tier];
+    const price = pricingData[currency][tier] || FALLBACK_PRICING_DATA[currency][tier];
     return {
       tier,
       label: RESOLUTION_TIERS[tier].label,

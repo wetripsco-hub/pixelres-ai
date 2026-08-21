@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "./actions"
 import { AdminDashboardClient } from "./AdminDashboardClient"
 import { PinLoginClient } from "./PinLoginClient"
+import { getPricingSettings } from "@/lib/pricing-store"
 
 export default async function AdminPage() {
   const isAuthorized = await isAdmin()
@@ -23,17 +24,8 @@ export default async function AdminPage() {
     .select('*')
     .order('created_at', { ascending: false })
 
-  // Fetch current pricing settings
-  const { data: pricingRows } = await adminClient
-    .from('pricing_settings')
-    .select('*')
-    .order('id')
-
-  const initialPricing = pricingRows || [
-    { id: 'web', usd_price: 1.99, pkr_price: 499, inr_price: 149 },
-    { id: '4k', usd_price: 4.99, pkr_price: 1299, inr_price: 399 },
-    { id: '8k', usd_price: 9.99, pkr_price: 2499, inr_price: 799 },
-  ]
+  // Fetch current pricing settings using resilient store
+  const initialPricing = await getPricingSettings()
 
   // Calculate Metrics
   const metrics = {

@@ -1,25 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { isAdmin } from '@/app/(admin)/admin/actions';
+import { getPricingSettings, savePricingSettings, PricingSetting } from '@/lib/pricing-store';
 
 // GET /api/admin/pricing — Fetch all pricing tiers
 export async function GET() {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
-    const adminClient = createAdminClient();
-    const { data, error } = await adminClient
-      .from('pricing_settings')
-      .select('*')
-      .order('id');
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ tiers: data || [] });
+    const tiers = await getPricingSettings();
+    return NextResponse.json({ tiers });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -28,7 +15,7 @@ export async function GET() {
 // Handler for both POST and PUT requests
 async function handleUpdatePricing(req: Request) {
   if (!(await isAdmin())) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized: Admin privileges required' }, { status: 401 });
   }
 
   try {
@@ -55,29 +42,15 @@ async function handleUpdatePricing(req: Request) {
       }
     }
 
-    const adminClient = createAdminClient();
+    const result = await savePricingSettings(tiers as PricingSetting[]);
 
-    for (const tier of tiers) {
-      const { error } = await adminClient
-        .from('pricing_settings')
-        .upsert(
-          {
-            id: tier.id,
-            usd_price: tier.usd_price,
-            pkr_price: tier.pkr_price,
-            inr_price: tier.inr_price,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'id' }
-        );
-
-      if (error) {
-        console.error(`Failed to update pricing tier ${tier.id}:`, error);
-        return NextResponse.json({ error: `Failed to update ${tier.id}: ${error.message}` }, { status: 500 });
-      }
-    }
-
-    return NextResponse.json({ success: true, message: "Pricing updated successfully" });
+    return NextResponse.json({
+      success: true,
+      message: result.savedToDb
+        ? "Pricing updated in database and local cache successfully!"
+        : "Pricing saved to active server store successfully!",
+      savedToDb: result.savedToDb,
+    });
   } catch (err: any) {
     console.error("Pricing update exception:", err);
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });

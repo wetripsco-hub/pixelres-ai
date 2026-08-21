@@ -7,7 +7,7 @@ import {
   Shield, Download, Upload, CheckCircle2, Loader2, AlertCircle, Settings, 
   FileImage, User, Image as ImageIcon, Save, Check, RefreshCw, LayoutDashboard, 
   DollarSign, ArrowLeft, LogOut, Search, Filter, Sparkles, Database, ExternalLink, 
-  CreditCard, HardDrive, CheckCircle, Clock, Zap
+  CreditCard, HardDrive, CheckCircle, Clock, Zap, Copy, Terminal
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -52,6 +52,25 @@ interface PricingRow {
   inr_price: number;
 }
 
+const SUPABASE_PRICING_SQL = `-- Run in Supabase SQL Editor to create database pricing table:
+CREATE TABLE IF NOT EXISTS public.pricing_settings (
+  id TEXT PRIMARY KEY,
+  usd_price NUMERIC NOT NULL,
+  pkr_price NUMERIC NOT NULL,
+  inr_price NUMERIC NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+INSERT INTO public.pricing_settings (id, usd_price, pkr_price, inr_price) VALUES
+('web', 1.99, 499, 149),
+('4k', 4.99, 1299, 399),
+('8k', 9.99, 2499, 799)
+ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE public.pricing_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public can view pricing" ON public.pricing_settings FOR SELECT USING (true);
+CREATE POLICY "Admin can update pricing" ON public.pricing_settings FOR ALL USING (true);`;
+
 export function AdminDashboardClient({ 
   initialOrders, 
   metrics,
@@ -77,6 +96,7 @@ export function AdminDashboardClient({
   const [pricing, setPricing] = useState<PricingRow[]>(initialPricing);
   const [isSavingPricing, setIsSavingPricing] = useState(false);
   const [pricingMessage, setPricingMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   // Upload Modal State
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -210,12 +230,23 @@ export function AdminDashboardClient({
         throw new Error(data?.error || `Failed to update pricing settings (Status ${res.status})`);
       }
 
-      setPricingMessage({ type: "success", text: "Multi-currency rates successfully updated!" });
-      setTimeout(() => setPricingMessage(null), 4000);
+      setPricingMessage({
+        type: "success",
+        text: data?.message || "Multi-currency rates successfully updated and saved!"
+      });
+      setTimeout(() => setPricingMessage(null), 5000);
     } catch (error: any) {
       setPricingMessage({ type: "error", text: error.message || "Failed to update pricing." });
     } finally {
       setIsSavingPricing(false);
+    }
+  };
+
+  const copySql = () => {
+    if (typeof navigator !== 'undefined') {
+      navigator.clipboard.writeText(SUPABASE_PRICING_SQL);
+      setCopiedSql(true);
+      setTimeout(() => setCopiedSql(false), 3000);
     }
   };
 
@@ -706,6 +737,40 @@ export function AdminDashboardClient({
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Optional Supabase SQL Database Migration Helper */}
+                <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                      <Terminal className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                      Supabase SQL Table Schema (Optional Database Sync)
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={copySql}
+                      className="h-8 px-3 text-xs rounded-xl border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 flex items-center gap-1.5"
+                    >
+                      {copiedSql ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-emerald-500" />
+                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Copied SQL</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5 text-slate-500" />
+                          <span>Copy SQL Query</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <pre className="p-4 rounded-2xl bg-slate-900 text-slate-300 text-xs font-mono overflow-x-auto border border-slate-800">
+                    {SUPABASE_PRICING_SQL}
+                  </pre>
+                  <p className="text-[11px] text-slate-500 mt-2">
+                    Pricing changes save immediately in your active workspace store. Paste the SQL query into your Supabase Dashboard &gt; SQL Editor to persist them in Postgres.
+                  </p>
                 </div>
               </Card>
             </div>
