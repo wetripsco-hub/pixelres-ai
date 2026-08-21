@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ImageUploader } from "@/components/dashboard/image-uploader";
-import { History, Download, Shield, LogOut, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon, PartyPopper, RefreshCw } from "lucide-react";
+import { History, Download, Shield, LogOut, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon, PartyPopper, RefreshCw, Sparkles, User, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,7 +54,6 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
     }
 
     if (payment === 'success' || orderId) {
-      // Auto-claim order and refresh orders list via API
       fetchFreshOrders(orderId || undefined);
     }
   }, [searchParams]);
@@ -135,10 +134,10 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'completed': return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/50"><CheckCircle2 className="h-3 w-3 mr-1" /> Completed</Badge>;
-      case 'processing': return <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/50"><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Processing</Badge>;
-      case 'failed': return <Badge variant="destructive" className="bg-red-500/20 text-red-400 border-red-500/50"><AlertCircle className="h-3 w-3 mr-1" /> Failed</Badge>;
-      default: return <Badge variant="outline" className="text-amber-400 border-amber-500/50 bg-amber-500/10">Pending</Badge>;
+      case 'completed': return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/40 text-xs font-semibold"><CheckCircle2 className="h-3 w-3 mr-1" /> Completed</Badge>;
+      case 'processing': return <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/40 text-xs font-semibold"><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Processing</Badge>;
+      case 'failed': return <Badge variant="destructive" className="bg-red-500/20 text-red-400 border-red-500/40 text-xs font-semibold"><AlertCircle className="h-3 w-3 mr-1" /> Failed</Badge>;
+      default: return <Badge variant="outline" className="text-amber-400 border-amber-500/40 bg-amber-500/10 text-xs font-semibold">Pending</Badge>;
     }
   };
 
@@ -173,30 +172,47 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-cyan-900/50 flex flex-col">
+    <div className="min-h-screen bg-[#07090E] text-slate-50 font-sans selection:bg-cyan-900/50 flex flex-col relative overflow-hidden">
+      {/* Background Ambient Lighting */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] rounded-full bg-cyan-600/12 blur-[140px]" />
+        <div className="absolute bottom-[-15%] right-[-10%] w-[50%] h-[50%] rounded-full bg-violet-600/12 blur-[140px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(#ffffff08_1px,transparent_1px)] [background-size:24px_24px] opacity-35" />
+      </div>
+
       {/* Header */}
-      <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-white/10 bg-slate-950/70 backdrop-blur-xl sticky top-0 z-50">
         <div className="container max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-500 to-violet-600 p-[1px]">
-              <div className="h-full w-full bg-slate-950 rounded-[7px] flex items-center justify-center">
-                <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-violet-500 text-xs">PX</span>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-600 p-[1px] shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-all">
+                <div className="h-full w-full bg-[#07090E] rounded-[10px] flex items-center justify-center">
+                  <Sparkles className="h-4 w-4 text-cyan-400" />
+                </div>
               </div>
-            </div>
-            <span className="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-100 to-slate-400 hidden sm:block">
-              PixelRes AI Workspace
-            </span>
+              <span className="font-extrabold text-lg tracking-tight text-slate-100 hidden sm:block">
+                PixelRes <span className="bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">Workspace</span>
+              </span>
+            </Link>
           </div>
 
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-slate-500 hidden md:block">{user.email}</span>
-            <Link href="/admin">
-              <Button size="sm" variant="ghost" className="text-slate-400 hover:text-slate-200">
-                <Shield className="h-4 w-4 mr-1 text-violet-400" /> Admin
+          <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/60 border border-white/10 text-xs text-slate-300">
+              <User className="h-3.5 w-3.5 text-cyan-400" />
+              <span>{user.email}</span>
+            </div>
+            <Link href="/studio">
+              <Button size="sm" variant="ghost" className="text-slate-300 hover:text-white text-xs font-semibold">
+                Studio
               </Button>
             </Link>
-            <Button size="sm" variant="outline" onClick={handleLogout} className="border-slate-700 hover:bg-slate-800 text-slate-300">
-              <LogOut className="h-4 w-4 mr-2" /> Sign Out
+            <Link href="/admin">
+              <Button size="sm" variant="ghost" className="text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1">
+                <Shield className="h-3.5 w-3.5 text-violet-400" /> Admin
+              </Button>
+            </Link>
+            <Button size="sm" variant="outline" onClick={handleLogout} className="border-white/10 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-semibold">
+              <LogOut className="h-3.5 w-3.5 mr-1.5" /> Sign Out
             </Button>
           </div>
         </div>
@@ -204,17 +220,16 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
 
       {/* Payment Success Banner */}
       {searchParams.get('payment') === 'success' && (
-        <div className="bg-emerald-500/10 border-b border-emerald-500/30 px-4 py-3 text-center">
-          <p className="text-emerald-400 font-medium flex items-center justify-center gap-2">
-            <PartyPopper className="h-5 w-5" />
-            Payment successful! Your image is now being processed.
+        <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-4 py-3 text-center z-10 backdrop-blur-md">
+          <p className="text-emerald-400 font-semibold text-sm flex items-center justify-center gap-2">
+            <PartyPopper className="h-4 w-4" />
+            Payment confirmed! Your neural upscale is currently processing.
           </p>
         </div>
       )}
 
       {/* Main Content */}
-      <main className="flex-1 container max-w-7xl mx-auto p-4 sm:p-8 grid grid-cols-1 xl:grid-cols-12 gap-8">
-
+      <main className="flex-1 container max-w-7xl mx-auto p-4 sm:p-8 grid grid-cols-1 xl:grid-cols-12 gap-8 relative z-10">
         {/* Left Column: Uploader */}
         <div className="xl:col-span-7">
            <ImageUploader countryCode={countryCode} initialTier={initialTier} />
@@ -222,9 +237,9 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
 
         {/* Right Column: Order History */}
         <div className="xl:col-span-5 space-y-6">
-          <Card className="bg-slate-900 border-slate-800 h-full flex flex-col shadow-xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between text-lg text-slate-100">
+          <Card className="bg-slate-900/60 border-white/10 backdrop-blur-2xl rounded-[2rem] h-full flex flex-col shadow-2xl overflow-hidden">
+            <CardHeader className="p-6 border-b border-white/10">
+              <CardTitle className="flex items-center justify-between text-lg text-slate-100 font-bold">
                 <span className="flex items-center gap-2">
                   <History className="h-5 w-5 text-cyan-400" /> Recent Enhancements
                 </span>
@@ -234,34 +249,35 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
                     variant="ghost"
                     onClick={() => fetchFreshOrders()}
                     disabled={isRefreshing}
-                    className="h-8 px-2 text-slate-400 hover:text-white hover:bg-slate-800"
+                    className="h-8 px-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl"
                     title="Refresh Orders"
                   >
-                    <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
+                    <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
                   </Button>
-                  <Badge variant="outline" className="text-xs border-slate-700 text-slate-400">
+                  <Badge variant="outline" className="text-xs border-white/10 bg-slate-950/60 text-slate-300 font-mono">
                     {orders.length} Orders
                   </Badge>
                 </div>
               </CardTitle>
-              <CardDescription className="text-slate-400">
-                Track status and download your upscaled high-resolution renders.
+              <CardDescription className="text-slate-400 text-xs">
+                Track live status and download your completed upscaled renders.
               </CardDescription>
             </CardHeader>
 
-            <CardContent className="flex-1 space-y-4 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
+            <CardContent className="flex-1 p-6 space-y-4 overflow-y-auto max-h-[620px] pr-2 custom-scrollbar">
               {orders.length === 0 ? (
-                <div className="text-center py-12 px-4 border border-slate-800 border-dashed rounded-xl bg-slate-950/30">
-                  <p className="text-slate-400 text-sm font-medium">No enhancement orders yet.</p>
+                <div className="text-center py-16 px-4 border border-dashed border-white/10 rounded-2xl bg-slate-950/40">
+                  <ImageIcon className="h-10 w-10 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-300 text-sm font-semibold">No enhancement orders yet.</p>
                   <p className="text-slate-500 text-xs mt-1">Upload an image on the left to start upscaling.</p>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => fetchFreshOrders()}
                     disabled={isRefreshing}
-                    className="mt-4 border-slate-700 text-slate-300 hover:bg-slate-800"
+                    className="mt-4 border-white/10 text-slate-300 hover:bg-slate-800 text-xs rounded-xl"
                   >
-                    <RefreshCw className={`h-3.5 w-3.5 mr-2 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
+                    <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
                     Refresh Orders
                   </Button>
                 </div>
@@ -269,12 +285,12 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
                 orders.map((order) => (
                   <div
                     key={order.id}
-                    className="p-4 rounded-xl border border-slate-800 bg-slate-950/50 hover:bg-slate-900 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group"
+                    className="p-4 rounded-2xl border border-white/10 bg-slate-950/60 hover:bg-slate-950/90 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group shadow-sm"
                   >
                     <div className="flex items-center gap-3 w-full sm:w-auto">
                       {/* Thumbnail */}
                       <div 
-                        className="h-14 w-14 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden relative flex-shrink-0 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-cyan-500/50 transition-all"
+                        className="h-14 w-14 rounded-xl bg-slate-800 border border-white/10 overflow-hidden relative flex-shrink-0 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-cyan-500/50 transition-all"
                         onClick={() => loadThumbnail(order.id, order.original_image_url)}
                         title="Click to load preview"
                       >
@@ -282,21 +298,21 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={thumbnails[order.id]} alt="preview" className="w-full h-full object-cover" />
                         ) : (
-                          <ImageIcon className="h-6 w-6 text-slate-500 group-hover:text-slate-400" />
+                          <ImageIcon className="h-5 w-5 text-slate-500 group-hover:text-slate-400" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-slate-200 flex items-center gap-2 truncate">
+                        <div className="font-semibold text-xs text-slate-200 flex items-center gap-2 truncate">
                           Order {order.id.substring(0, 8)}
                         </div>
-                        <div className="text-xs text-slate-400 flex flex-wrap items-center gap-2 mt-1">
-                          <span className="text-cyan-400 font-mono uppercase bg-cyan-950/50 px-1.5 rounded">{order.target_resolution}</span>
+                        <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-2 mt-1">
+                          <span className="text-cyan-400 font-mono uppercase bg-cyan-950/50 px-1.5 py-0.5 rounded border border-cyan-500/20">{order.target_resolution}</span>
                           <span>•</span>
                           <span className="capitalize">{order.enhancement_type}</span>
                           <span>•</span>
-                          <span className="text-slate-500">{formatPrice(order.amount_paid, order.currency)}</span>
+                          <span className="text-slate-400 font-mono font-medium">{formatPrice(order.amount_paid, order.currency)}</span>
                         </div>
-                        <div className="text-[11px] text-slate-500 mt-1">{formatDate(order.created_at)}</div>
+                        <div className="text-[10px] text-slate-500 mt-1">{formatDate(order.created_at)}</div>
                       </div>
                     </div>
 
@@ -306,10 +322,10 @@ export function DashboardClient({ countryCode, initialOrders, user }: DashboardC
                       <Button
                         size="icon"
                         variant="ghost"
-                        className={`h-8 w-8 rounded-full transition-colors ${order.status === 'completed' ? 'text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950' : 'text-slate-600 cursor-not-allowed'}`}
+                        className={`h-9 w-9 rounded-xl transition-colors ${order.status === 'completed' ? 'text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/80 border border-cyan-500/30' : 'text-slate-600 cursor-not-allowed'}`}
                         disabled={order.status !== 'completed'}
                         onClick={() => handleDownload(order)}
-                        title={order.status === 'completed' ? "Download Output" : "Waiting for completion..."}
+                        title={order.status === 'completed' ? "Download Output" : "Processing deliverable..."}
                       >
                         <Download className="h-4 w-4" />
                       </Button>

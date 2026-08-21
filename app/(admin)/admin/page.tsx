@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin"
+import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "./actions"
 import { AdminDashboardClient } from "./AdminDashboardClient"
 import { PinLoginClient } from "./PinLoginClient"
@@ -9,6 +10,11 @@ export default async function AdminPage() {
   if (!isAuthorized) {
     return <PinLoginClient />
   }
+
+  // Get current user email (if logged in via Supabase)
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const adminEmail = user?.email || process.env.ADMIN_EMAIL || "wetrips.co@gmail.com"
 
   // Fetch all orders using Admin Client (bypasses RLS)
   const adminClient = createAdminClient()
@@ -44,7 +50,7 @@ export default async function AdminPage() {
     metrics.totalOrders = orders.length
     orders.forEach(order => {
       if (order.status === 'completed') metrics.completedJobs++;
-      if (order.status === 'pending') metrics.pendingJobs++;
+      if (order.status === 'pending' || order.status === 'processing') metrics.pendingJobs++;
 
       if (order.status !== 'failed') {
         if (order.currency === 'USD') metrics.totalUsdRevenue += order.amount_paid;
@@ -59,19 +65,11 @@ export default async function AdminPage() {
   metrics.estimatedTotalUsd = metrics.totalUsdRevenue + estimatedPkrToUsd + estimatedInrToUsd;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 font-sans p-4 sm:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <header>
-          <h1 className="text-3xl font-extrabold text-slate-100 tracking-tight">Admin Command Center</h1>
-          <p className="text-slate-400 mt-1">Manage orders, fulfill deliverable uploads, configure pricing, and monitor revenue.</p>
-        </header>
-
-        <AdminDashboardClient
-          initialOrders={orders || []}
-          metrics={metrics}
-          initialPricing={initialPricing}
-        />
-      </div>
-    </div>
+    <AdminDashboardClient
+      initialOrders={orders || []}
+      metrics={metrics}
+      initialPricing={initialPricing}
+      adminEmail={adminEmail}
+    />
   )
 }
