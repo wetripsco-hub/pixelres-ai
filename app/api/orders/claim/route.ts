@@ -36,6 +36,20 @@ export async function POST(req: Request) {
 
     const adminClient = createAdminClient();
 
+    // Ensure profiles record exists to satisfy FK constraint
+    const { data: profile } = await adminClient
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!profile) {
+      await adminClient.from("profiles").upsert({
+        id: userId,
+        email: userEmail || null,
+      });
+    }
+
     // 1. If specific orderId supplied, claim it
     if (orderId) {
       await adminClient

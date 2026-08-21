@@ -19,7 +19,11 @@ export async function isAdmin() {
 
   if (!user) return false;
 
-  if (process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL) {
+  const adminEmails = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || 'wetrips.co@gmail.com')
+    .split(',')
+    .map(e => e.trim().toLowerCase());
+
+  if (user.email && adminEmails.includes(user.email.toLowerCase())) {
     return true;
   }
 
@@ -37,7 +41,7 @@ export async function verifyPin(pin: string) {
   const correctPin = process.env.ADMIN_PIN || '1234'
   if (pin === correctPin) {
     const cookieStore = cookies()
-    cookieStore.set('admin_pin_access', 'true', { maxAge: 60 * 60 * 24, httpOnly: true, path: '/admin' })
+    cookieStore.set('admin_pin_access', 'true', { maxAge: 60 * 60 * 24, httpOnly: true, path: '/' })
     revalidatePath('/admin')
     return { success: true }
   }
@@ -128,6 +132,42 @@ export async function finalizeOrder(orderId: string, filePath: string) {
 
   revalidatePath('/admin')
   return { success: true }
+}
+
+export async function uploadDeliverable(orderId: string, userId: string | null, formData: FormData) {
+  if (!(await isAdmin())) {
+    throw new Error("Unauthorized")
+  }
+
+  const file = formData.get("file") as File | null
+  if (!file) throw new Error("No file provided")
+
+  const adminClient = createAdminClient()
+  const fileExt = file.name.split('.').pop() || 'jpg'
+  const uid = userId || 'guest'
+  const filePath = `deliverables/${uid}/${orderId}_upscaled.${fileExt}`
+
+  const { data: buckets } = await adminClient.storage.listBuckets()
+  if (!buckets?.some(b => b.name === 'upscaled-outputs')) {
+    await adminClient.storage.createBucket('upscaled-outputs', { public: true })
+  }
+
+  const arrayBuffer = await file.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+
+  const { data, error } = await adminClient.storage
+    .from('upscaled-outputs')
+    .upload(filePath, buffer, {
+      contentType: file.type || 'image/jpeg',
+      upsert: true,
+    })
+
+  if (error) {
+    throw new Error(`Failed to upload deliverable: ${error.message}`)
+  }
+
+  await finalizeOrder(orderId, data.path)
+  return { success: true, filePath: data.path }
 }
 
 export async function generateThumbnailUrl(filePath: string) {

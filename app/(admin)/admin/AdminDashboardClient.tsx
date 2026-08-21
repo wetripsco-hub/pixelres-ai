@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { generateDownloadUrl, updateOrderStatus, generateUploadUrl, finalizeOrder, generateThumbnailUrl } from "./actions";
+import { generateDownloadUrl, updateOrderStatus, generateUploadUrl, finalizeOrder, generateThumbnailUrl, uploadDeliverable } from "./actions";
 import { Shield, Download, Upload, CheckCircle2, Loader2, AlertCircle, Settings, FileImage, User, Image as ImageIcon, Save, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -120,27 +120,15 @@ export function AdminDashboardClient({
 
     try {
       setIsUploading(true);
-      const fileExt = uploadFile.name.split('.').pop() || 'jpg';
-      const orderId = uploadOrder.id;
+      const formData = new FormData();
+      formData.append('file', uploadFile);
 
-      // 1. Get signed upload URL
-      const { signedUrl, token, filePath } = await generateUploadUrl(orderId, uploadOrder.user_id || 'guest', fileExt);
+      const res = await uploadDeliverable(uploadOrder.id, uploadOrder.user_id, formData);
 
-      // 2. Upload file directly to Supabase using the signed URL
-      const supabase = createClient();
-      const { error: uploadError } = await supabase.storage
-        .from('upscaled-outputs')
-        .uploadToSignedUrl(filePath, token, uploadFile);
-
-      if (uploadError) throw new Error(uploadError.message);
-
-      // 3. Finalize order
-      await finalizeOrder(orderId, filePath);
-
-      setOrders(orders.map(o => o.id === orderId ? {
+      setOrders(orders.map(o => o.id === uploadOrder.id ? {
         ...o,
         status: 'completed',
-        upscaled_image_url: filePath,
+        upscaled_image_url: res.filePath,
         completed_at: new Date().toISOString()
       } : o));
 

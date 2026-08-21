@@ -52,11 +52,32 @@ export async function POST(req: Request) {
       // Guest checkout — authenticatedUserId stays null
     }
 
-    // NEVER insert the string "guest" — always use null to prevent FK constraint errors
-    const safeUserId = authenticatedUserId || (userId && userId !== "guest" ? userId : null);
+    // Determine target user ID (never insert string "guest")
+    let safeUserId: string | null = authenticatedUserId || (userId && userId !== "guest" ? userId : null);
 
     // Create admin client with SUPABASE_SERVICE_ROLE_KEY to bypass RLS
     const supabaseAdmin = createAdminClient();
+
+    // Ensure profiles row exists if user_id is provided, preventing foreign key constraint violations
+    if (safeUserId) {
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("id", safeUserId)
+        .maybeSingle();
+
+      if (!profile) {
+        const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
+          id: safeUserId,
+          email: safeCustomerEmail || null,
+        });
+
+        if (profileError) {
+          console.warn("[Orders Create] Profile creation failed, setting user_id to null:", profileError.message);
+          safeUserId = null;
+        }
+      }
+    }
 
     // Perform strict upsert into orders table
     const { error: upsertError } = await supabaseAdmin.from("orders").upsert({
@@ -74,6 +95,27 @@ export async function POST(req: Request) {
 
     if (upsertError) {
       console.error("CRITICAL DB INSERT ERROR:", upsertError);
+
+      // If user_id FK error happens anyway, retry with user_id = null
+      if (upsertError.message.includes("foreign key") || upsertError.code === "23503") {
+        const { error: retryError } = await supabaseAdmin.from("orders").upsert({
+          id: orderId,
+          user_id: null,
+          guest_email: safeCustomerEmail,
+          original_image_url: filePath,
+          target_resolution: targetResolution,
+          enhancement_type: enhancementType || "general",
+          currency: currency || "USD",
+          amount_paid: amountPaid || 0,
+          status: "processing",
+          created_at: new Date().toISOString(),
+        });
+
+        if (!retryError) {
+          return NextResponse.json({ success: true, orderId });
+        }
+      }
+
       return NextResponse.json({ error: upsertError.message }, { status: 500 });
     }
 
