@@ -90,7 +90,7 @@ export async function POST(req: Request) {
         },
       ],
       mode: "payment",
-      success_url: `${baseUrl}/dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${baseUrl}/dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
       cancel_url: `${baseUrl}/dashboard?payment=cancelled`,
       metadata: {
         orderId,
