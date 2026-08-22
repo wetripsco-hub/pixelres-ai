@@ -36,6 +36,7 @@ export function Navbar({ countryCode = "US" }: { countryCode?: string }) {
   const navLinks = [
     { name: "Features", href: "/#features" },
     { name: "Pricing", href: "/pricing" },
+    { name: "Dashboard", href: "/dashboard" },
     { name: "Login", href: "/login" },
   ];
 
@@ -43,29 +44,29 @@ export function Navbar({ countryCode = "US" }: { countryCode?: string }) {
   const currency = getCurrency(countryCode);
 
   return (
-    <header className="relative z-50 w-full border-b border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl transition-colors duration-200">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+    <header className="relative z-50 w-full border-b border-slate-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-950/70 backdrop-blur-xl transition-colors duration-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex justify-between items-center">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-600 p-[1px] shadow-md shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-all">
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-orange-500 via-amber-500 to-orange-500 dark:from-cyan-500 dark:to-violet-600 p-[1px] shadow-md shadow-orange-500/20 dark:shadow-cyan-500/20 group-hover:shadow-orange-500/40 dark:group-hover:shadow-cyan-500/40 transition-all">
             <div className="h-full w-full bg-white dark:bg-[#07090E] rounded-[11px] flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-cyan-600 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
+              <Sparkles className="h-4 w-4 text-orange-500 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
             </div>
           </div>
           <span className="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-            PixelRes <span className="bg-gradient-to-r from-cyan-500 to-violet-500 bg-clip-text text-transparent">AI</span>
+            PixelRes <span className="bg-gradient-to-r from-orange-500 to-amber-500 dark:from-cyan-500 dark:to-violet-500 bg-clip-text text-transparent">AI</span>
           </span>
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-7 text-sm font-semibold">
+        <nav className="hidden md:flex items-center gap-6 text-sm font-semibold">
           {navLinks.map((link) => (
             <Link
               key={link.name}
               href={link.href}
               className={`transition-colors ${
                 pathname === link.href
-                  ? "text-cyan-600 dark:text-cyan-400"
+                  ? "text-orange-600 dark:text-cyan-400 font-bold"
                   : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
@@ -73,20 +74,18 @@ export function Navbar({ countryCode = "US" }: { countryCode?: string }) {
             </Link>
           ))}
 
-          <div className="flex items-center gap-3 pl-2 border-l border-slate-200 dark:border-white/10">
+          <div className="flex items-center gap-3 pl-3 border-l border-slate-200 dark:border-white/10">
             {/* Theme Toggle */}
             <ThemeToggle />
 
             {/* Currency Pill */}
-            <div className="group relative flex items-center justify-center p-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 cursor-help transition-colors">
-              <span className="text-base leading-none">{flagEmoji}</span>
-              <div className="absolute top-full mt-2 w-max px-2.5 py-1 bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-mono rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl border border-white/10">
-                {currency}
-              </div>
+            <div className="group relative flex items-center justify-center px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 cursor-help transition-colors text-xs font-mono font-semibold text-slate-700 dark:text-slate-300">
+              <span className="mr-1.5 text-sm leading-none">{flagEmoji}</span>
+              <span>{currency}</span>
             </div>
 
             <Link href="/studio">
-              <Button className="px-5 py-2 rounded-xl font-bold text-xs shadow-md bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all">
+              <Button className="px-5 py-2 rounded-xl font-bold text-xs shadow-md bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 dark:from-cyan-600 dark:to-cyan-500 hover:opacity-95 text-white shadow-orange-500/20 dark:shadow-cyan-500/20 btn-interactive transition-all">
                 Launch Studio
               </Button>
             </Link>
@@ -94,11 +93,12 @@ export function Navbar({ countryCode = "US" }: { countryCode?: string }) {
         </nav>
 
         {/* Mobile Menu Toggle */}
-        <div className="md:hidden flex items-center gap-2.5">
+        <div className="md:hidden flex items-center gap-2">
           <ThemeToggle />
 
-          <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10">
-            <span className="text-base leading-none">{flagEmoji}</span>
+          <div className="px-2 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-xs font-mono font-semibold">
+            <span className="mr-1">{flagEmoji}</span>
+            <span>{currency}</span>
           </div>
 
           <button
@@ -121,7 +121,7 @@ export function Navbar({ countryCode = "US" }: { countryCode?: string }) {
               onClick={() => setIsMobileMenuOpen(false)}
               className={`block px-4 py-2.5 rounded-xl text-sm font-semibold ${
                 pathname === link.href
-                  ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+                  ? "bg-orange-500/10 text-orange-600 dark:bg-cyan-500/10 dark:text-cyan-400"
                   : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900"
               }`}
             >
@@ -130,7 +130,7 @@ export function Navbar({ countryCode = "US" }: { countryCode?: string }) {
           ))}
           <div className="h-px w-full bg-slate-200 dark:bg-white/10 my-1" />
           <Link href="/studio" onClick={() => setIsMobileMenuOpen(false)} className="block mt-1">
-            <Button className="w-full bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-bold rounded-xl h-11 shadow-lg shadow-cyan-500/25">
+            <Button className="w-full bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 dark:from-cyan-600 dark:to-cyan-500 hover:opacity-95 text-white font-bold rounded-xl h-11 shadow-lg shadow-orange-500/20 dark:shadow-cyan-500/25 btn-interactive">
               Launch Studio
             </Button>
           </Link>

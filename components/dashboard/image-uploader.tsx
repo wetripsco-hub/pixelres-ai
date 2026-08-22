@@ -52,6 +52,15 @@ export function ImageUploader({
     return () => { isMounted = false };
   }, [countryCode, initialTier]);
 
+  // Object URL Memory Cleanup
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setError(null);
     if (acceptedFiles.length > 0) {
@@ -60,12 +69,15 @@ export function ImageUploader({
         setError("File exceeds 25MB limit.");
         return;
       }
+      if (previewUrl && previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
       setFile(selectedFile);
       setPreviewUrl(URL.createObjectURL(selectedFile));
     }
-  }, []);
+  }, [previewUrl]);
 
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       "image/jpeg": [".jpeg", ".jpg"],
@@ -81,7 +93,9 @@ export function ImageUploader({
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     setFile(null);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (previewUrl && previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
     setPreviewUrl(null);
     setError(null);
   };
@@ -177,13 +191,13 @@ export function ImageUploader({
   return (
     <Card className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/90 dark:border-white/10 shadow-2xl w-full max-w-4xl mx-auto rounded-[2.5rem] overflow-hidden backdrop-blur-2xl transition-all">
       <CardHeader className="bg-slate-50/50 dark:bg-slate-950/40 border-b border-slate-100 dark:border-white/10 p-6 sm:p-8">
-        <CardTitle className="text-2xl text-slate-900 dark:text-slate-100 flex items-center gap-3 font-bold">
-          <div className="h-10 w-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-600 dark:text-cyan-400">
+        <CardTitle className="text-2xl text-slate-900 dark:text-slate-100 flex items-center gap-3 font-bold tracking-tight">
+          <div className="h-10 w-10 rounded-xl bg-orange-500/10 dark:bg-cyan-500/10 border border-orange-500/20 dark:border-cyan-500/20 flex items-center justify-center text-orange-600 dark:text-cyan-400">
              <UploadCloud className="h-5 w-5" />
           </div>
           New Enhancement Order
         </CardTitle>
-        <CardDescription className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+        <CardDescription className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1">
           Upload your image and configure the AI enhancement parameters.
         </CardDescription>
       </CardHeader>
@@ -194,10 +208,10 @@ export function ImageUploader({
           {...getRootProps()}
           className={`border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center transition-all duration-300 cursor-pointer relative overflow-hidden group ${
             isDragActive 
-              ? "border-cyan-500 bg-cyan-50 dark:bg-cyan-950/30 shadow-[0_0_40px_rgba(6,182,212,0.2)] scale-[1.01]" 
+              ? "border-orange-500 dark:border-cyan-500 bg-orange-50 dark:bg-cyan-950/30 shadow-[0_0_40px_rgba(249,115,22,0.2)] dark:shadow-[0_0_40px_rgba(6,182,212,0.2)] scale-[1.01]" 
               : file 
               ? "border-slate-300 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-950/50" 
-              : "border-slate-300 dark:border-white/10 bg-slate-50/80 dark:bg-slate-950/30 hover:border-cyan-500/50 hover:bg-cyan-500/5"
+              : "border-slate-300 dark:border-white/10 bg-slate-50/80 dark:bg-slate-950/30 hover:border-orange-500/50 dark:hover:border-cyan-500/50 hover:bg-orange-500/5 dark:hover:bg-cyan-500/5"
           } ${(isUploading || isLoadingPricing) ? "pointer-events-none opacity-80" : ""}`}
         >
           <input {...getInputProps()} />
@@ -232,9 +246,9 @@ export function ImageUploader({
                 className="flex flex-col items-center justify-center py-10 pointer-events-none"
               >
                 <div className="h-20 w-20 bg-slate-100 dark:bg-slate-900 rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 transition-all duration-300 shadow-xl border border-slate-200 dark:border-white/10">
-                  {isLoadingPricing ? <Loader2 className="h-9 w-9 animate-spin text-slate-400" /> : <ImageIcon className="h-9 w-9 text-slate-400 group-hover:text-cyan-500 transition-colors" />}
+                  {isLoadingPricing ? <Loader2 className="h-9 w-9 animate-spin text-slate-400" /> : <ImageIcon className="h-9 w-9 text-slate-400 group-hover:text-orange-500 dark:group-hover:text-cyan-500 transition-colors" />}
                 </div>
-                <p className="text-slate-900 dark:text-slate-100 font-extrabold text-lg mb-2">
+                <p className="text-slate-900 dark:text-slate-100 font-extrabold text-lg mb-2 tracking-tight">
                   {isLoadingPricing ? "Loading configurations..." : isDragActive ? "Drop the image here" : "Click anywhere or drag & drop an image"}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
@@ -246,9 +260,9 @@ export function ImageUploader({
 
           {isUploading && (
             <div className="absolute inset-0 bg-slate-900/90 dark:bg-[#07090E]/95 backdrop-blur-md flex flex-col items-center justify-center z-20 rounded-3xl p-6">
-              <Loader2 className="h-12 w-12 text-cyan-400 animate-spin mb-6" />
+              <Loader2 className="h-12 w-12 text-orange-400 dark:text-cyan-400 animate-spin mb-6" />
               <div className="w-full max-w-xs bg-slate-800 rounded-full h-3 mb-3 border border-white/10 overflow-hidden p-0.5">
-                <div className="bg-gradient-to-r from-cyan-500 to-violet-500 h-full rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(6,182,212,0.6)]" style={{ width: `${uploadProgress}%` }}></div>
+                <div className="bg-gradient-to-r from-orange-500 to-amber-500 dark:from-cyan-500 dark:to-violet-500 h-full rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(249,115,22,0.6)] dark:shadow-[0_0_15px_rgba(6,182,212,0.6)]" style={{ width: `${uploadProgress}%` }}></div>
               </div>
               <span className="text-slate-200 font-semibold text-sm">{uploadProgress < 100 ? `Uploading (${uploadProgress}%)` : "Redirecting to checkout…"}</span>
             </div>
@@ -266,7 +280,7 @@ export function ImageUploader({
           {/* Resolution selector */}
           <div className="space-y-4">
             <Label className="text-slate-900 dark:text-slate-100 font-bold text-base flex items-center gap-2">
-              <span className="bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 h-6 w-6 rounded-full flex items-center justify-center text-xs font-black">1</span>
+              <span className="bg-orange-500/20 text-orange-600 dark:bg-cyan-500/20 dark:text-cyan-400 h-6 w-6 rounded-full flex items-center justify-center text-xs font-black">1</span>
               Target Resolution
             </Label>
             <RadioGroup value={selectedTier} onValueChange={setSelectedTier} disabled={isUploading || isLoadingPricing} className="gap-3">
@@ -276,15 +290,15 @@ export function ImageUploader({
                   onClick={() => setSelectedTier(tier.tier)}
                   className={`flex items-start space-x-3 border rounded-2xl p-4 transition-all duration-200 cursor-pointer ${
                     selectedTier === tier.tier
-                      ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.12)]"
+                      ? "border-orange-500 bg-orange-500/5 dark:border-cyan-500 dark:bg-cyan-500/10 shadow-sm"
                       : "border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900"
                   }`}
                 >
-                  <RadioGroupItem value={tier.tier} id={`dash-res-${tier.tier}`} className="border-slate-400 dark:border-slate-600 text-cyan-500 mt-1" />
+                  <RadioGroupItem value={tier.tier} id={`dash-res-${tier.tier}`} className="border-slate-400 dark:border-slate-600 text-orange-500 dark:text-cyan-500 mt-1" />
                   <div className="flex-1 w-full">
                     <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between w-full text-sm sm:text-base">
                       <span>{tier.label}</span>
-                      <span className="text-cyan-600 dark:text-cyan-400 font-mono font-extrabold">
+                      <span className="text-orange-600 dark:text-cyan-400 font-mono font-extrabold">
                         {isLoadingPricing ? <Loader2 className="h-4 w-4 animate-spin inline" /> : tier.formattedPrice}
                       </span>
                     </div>
@@ -306,7 +320,7 @@ export function ImageUploader({
                 onClick={() => setEnhancementType("general")}
                 className={`flex items-start space-x-3 border rounded-2xl p-4 transition-all duration-200 cursor-pointer ${
                   enhancementType === "general"
-                    ? "border-violet-500 bg-violet-500/10 shadow-[0_0_20px_rgba(139,92,246,0.12)]"
+                    ? "border-violet-500 bg-violet-500/10 shadow-sm"
                     : "border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900"
                 }`}
               >
@@ -321,7 +335,7 @@ export function ImageUploader({
                 onClick={() => setEnhancementType("face")}
                 className={`flex items-start space-x-3 border rounded-2xl p-4 transition-all duration-200 cursor-pointer ${
                   enhancementType === "face"
-                    ? "border-violet-500 bg-violet-500/10 shadow-[0_0_20px_rgba(139,92,246,0.12)]"
+                    ? "border-violet-500 bg-violet-500/10 shadow-sm"
                     : "border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900"
                 }`}
               >
@@ -339,14 +353,14 @@ export function ImageUploader({
       <CardFooter className="bg-slate-50/50 dark:bg-slate-950/60 p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-center border-t border-slate-100 dark:border-white/10 gap-6">
         <div className="text-center sm:text-left">
           <div className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">Total Investment</div>
-          <div className="font-black text-slate-900 dark:text-white text-3xl sm:text-4xl">
+          <div className="font-black text-slate-900 dark:text-white text-3xl sm:text-4xl font-mono">
             {isLoadingPricing ? <Loader2 className="h-7 w-7 animate-spin inline-block mt-1" /> : activePricing.formattedPrice}
           </div>
         </div>
         <Button
           onClick={handleUploadAndCheckout}
           disabled={!file || isUploading || isLoadingPricing}
-          className="w-full sm:w-auto bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white h-14 px-10 text-base font-bold rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.3)] hover:shadow-[0_0_35px_rgba(6,182,212,0.5)] transition-all flex items-center justify-center gap-3 disabled:opacity-50 group"
+          className="w-full sm:w-auto bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 dark:from-cyan-600 dark:to-cyan-500 hover:opacity-95 text-white h-14 px-10 text-base font-bold rounded-2xl shadow-lg shadow-orange-500/20 dark:shadow-cyan-500/20 btn-interactive flex items-center justify-center gap-3 disabled:opacity-50 group"
         >
           {isUploading ? (
              <>

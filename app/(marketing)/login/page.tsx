@@ -204,7 +204,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-12 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white rounded-xl font-semibold shadow-[0_0_25px_rgba(6,182,212,0.3)] hover:shadow-[0_0_35px_rgba(6,182,212,0.5)] transition-all duration-300 flex items-center justify-center gap-2"
+                className="w-full h-12 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 dark:from-cyan-600 dark:to-cyan-500 hover:opacity-95 text-white rounded-xl font-bold shadow-lg shadow-orange-500/20 dark:shadow-cyan-500/30 btn-interactive transition-all duration-200 flex items-center justify-center gap-2"
               >
                 {isLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />

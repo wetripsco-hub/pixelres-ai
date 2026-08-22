@@ -317,7 +317,7 @@ export function AdminDashboardClient({
               onClick={() => setActiveNav("orders")}
               className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all ${
                 activeNav === "orders"
-                  ? "bg-cyan-500/10 dark:bg-gradient-to-r dark:from-cyan-500/15 dark:to-violet-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                  ? "bg-orange-500/10 dark:bg-cyan-500/15 border border-orange-500/30 dark:border-cyan-500/30 text-orange-600 dark:text-cyan-400 shadow-sm"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900/50"
               }`}
             >
@@ -325,7 +325,7 @@ export function AdminDashboardClient({
                 <LayoutDashboard className="h-4 w-4" />
                 <span>Orders & Overview</span>
               </div>
-              <Badge variant="outline" className="text-[10px] border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300">
+              <Badge variant="outline" className="text-[10px] font-mono border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300">
                 {orders.length}
               </Badge>
             </button>
@@ -334,7 +334,7 @@ export function AdminDashboardClient({
               onClick={() => setActiveNav("pricing")}
               className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all ${
                 activeNav === "pricing"
-                  ? "bg-cyan-500/10 dark:bg-gradient-to-r dark:from-cyan-500/15 dark:to-violet-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                  ? "bg-orange-500/10 dark:bg-cyan-500/15 border border-orange-500/30 dark:border-cyan-500/30 text-orange-600 dark:text-cyan-400 shadow-sm"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900/50"
               }`}
             >
@@ -348,7 +348,7 @@ export function AdminDashboardClient({
               onClick={() => setActiveNav("settings")}
               className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all ${
                 activeNav === "settings"
-                  ? "bg-cyan-500/10 dark:bg-gradient-to-r dark:from-cyan-500/15 dark:to-violet-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                  ? "bg-orange-500/10 dark:bg-cyan-500/15 border border-orange-500/30 dark:border-cyan-500/30 text-orange-600 dark:text-cyan-400 shadow-sm"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900/50"
               }`}
             >

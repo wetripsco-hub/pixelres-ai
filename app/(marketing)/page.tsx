@@ -10,22 +10,12 @@ export default async function MarketingPage() {
   const initialPricing = await getGlobalPricing();
 
   return (
-    <div className="min-h-screen bg-[#090A0F] text-slate-50 selection:bg-cyan-900/50 selection:text-cyan-50 font-sans overflow-hidden relative">
-      {/* Background Effects — geometric cross-hatch + radial flares */}
+    <div className="min-h-screen bg-slate-50 dark:bg-[#07090E] text-slate-900 dark:text-slate-50 selection:bg-orange-500/20 dark:selection:bg-cyan-500/30 font-sans overflow-hidden relative transition-colors duration-200">
+      {/* Background Effects — subtle radial flares */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        {/* Geometric pattern overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              'linear-gradient(45deg, transparent 48%, rgba(6,182,212,0.5) 50%, transparent 52%), linear-gradient(-45deg, transparent 48%, rgba(139,92,246,0.4) 50%, transparent 52%)',
-            backgroundSize: '150px 150px',
-          }}
-        />
-        {/* Radial glow: top-left cyan */}
-        <div className="absolute top-[10%] left-[-100px] w-[400px] h-[400px] rounded-full bg-[radial-gradient(circle,rgba(6,182,212,0.2)_0%,transparent_70%)]" />
-        {/* Radial glow: top-right violet */}
-        <div className="absolute top-[30%] right-[-150px] w-[400px] h-[400px] rounded-full bg-[radial-gradient(circle,rgba(139,92,246,0.2)_0%,transparent_70%)]" />
+        <div className="absolute top-[10%] left-[-100px] w-[450px] h-[450px] rounded-full bg-orange-500/10 dark:bg-cyan-500/10 blur-[130px]" />
+        <div className="absolute top-[30%] right-[-150px] w-[450px] h-[450px] rounded-full bg-amber-500/10 dark:bg-violet-500/10 blur-[130px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(#00000008_1px,transparent_1px)] dark:bg-[radial-gradient(#ffffff08_1px,transparent_1px)] [background-size:24px_24px] opacity-40" />
       </div>
 
       <main className="relative z-10">

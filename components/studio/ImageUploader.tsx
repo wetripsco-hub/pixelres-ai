@@ -85,8 +85,20 @@ export function StudioImageUploader({
     return () => { cancelled = true; };
   }, [countryCode]);
 
+  // Cleanup object URL on unmount or when previewUrl changes
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   // Read file dimensions & size
   const handleFileSelection = (selectedFile: File) => {
+    if (previewUrl && previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
     setFile(selectedFile);
     const objectUrl = URL.createObjectURL(selectedFile);
     setPreviewUrl(objectUrl);
@@ -101,6 +113,17 @@ export function StudioImageUploader({
       });
     };
     img.src = objectUrl;
+  };
+
+  const handleClear = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (previewUrl && previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setFile(null);
+    setPreviewUrl(null);
+    setFileMetadata(null);
+    setError(null);
   };
 
   // Dropzone callback
@@ -135,15 +158,6 @@ export function StudioImageUploader({
     noClick: false,
     noKeyboard: false,
   });
-
-  const handleClear = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setFile(null);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
-    setFileMetadata(null);
-    setError(null);
-  };
 
   const handleUploadAndCheckout = async () => {
     if (!file) return;
@@ -438,14 +452,14 @@ export function StudioImageUploader({
                       onClick={() => !isUploading && setSelectedTier(tier.tier)}
                       className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer relative ${
                         isSelected
-                          ? "border-cyan-500 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.12)]"
+                          ? "border-orange-500 bg-orange-500/5 dark:border-cyan-500 dark:bg-cyan-500/10 shadow-sm"
                           : "border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900/80"
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
-                            isSelected ? "border-cyan-500 bg-cyan-500 text-white" : "border-slate-400 dark:border-slate-600"
+                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                            isSelected ? "border-orange-500 bg-orange-500 dark:border-cyan-500 dark:bg-cyan-500 text-white" : "border-slate-400 dark:border-slate-600"
                           }`}>
                             {isSelected && <Check className="h-3 w-3" />}
                           </div>
@@ -453,12 +467,12 @@ export function StudioImageUploader({
                             <div className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
                               {tier.label}
                               {tier.tier === "4k" && (
-                                <span className="bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                <span className="bg-orange-500/15 text-orange-600 dark:bg-cyan-500/20 dark:text-cyan-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
                                   Most Popular
                                 </span>
                               )}
                               {tier.tier === "8k" && (
-                                <span className="bg-violet-500/20 text-violet-600 dark:text-violet-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                <span className="bg-violet-500/15 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
                                   Max Clarity
                                 </span>
                               )}
@@ -470,7 +484,7 @@ export function StudioImageUploader({
                         </div>
 
                         <div className="text-right">
-                          <div className="font-mono font-extrabold text-sm text-cyan-600 dark:text-cyan-400">
+                          <div className="font-mono font-extrabold text-sm text-orange-600 dark:text-cyan-400">
                             {isLoadingPricing ? <Loader2 className="h-4 w-4 animate-spin inline" /> : tier.formattedPrice}
                           </div>
                         </div>
@@ -494,7 +508,7 @@ export function StudioImageUploader({
                   onClick={() => !isUploading && setEnhancementType("general")}
                   className={`p-3.5 rounded-2xl border text-left transition-all ${
                     enhancementType === "general"
-                      ? "border-violet-500 bg-violet-500/10 shadow-[0_0_15px_rgba(139,92,246,0.15)]"
+                      ? "border-violet-500 bg-violet-500/10 shadow-sm"
                       : "border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900"
                   }`}
                 >
@@ -507,7 +521,7 @@ export function StudioImageUploader({
                   onClick={() => !isUploading && setEnhancementType("face")}
                   className={`p-3.5 rounded-2xl border text-left transition-all ${
                     enhancementType === "face"
-                      ? "border-violet-500 bg-violet-500/10 shadow-[0_0_15px_rgba(139,92,246,0.15)]"
+                      ? "border-violet-500 bg-violet-500/10 shadow-sm"
                       : "border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900"
                   }`}
                 >
@@ -531,7 +545,7 @@ export function StudioImageUploader({
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="studio-guest-email" className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      <Mail className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
+                      <Mail className="h-3.5 w-3.5 text-orange-500 dark:text-cyan-400" />
                       Contact Email <span className="text-[10px] text-slate-400 font-normal">(Receipt & Download Link)</span>
                     </Label>
                     <span className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold bg-violet-500/10 px-2 py-0.5 rounded-full">
@@ -565,7 +579,7 @@ export function StudioImageUploader({
               <Button
                 onClick={handleUploadAndCheckout}
                 disabled={!file || isUploading || isLoadingPricing}
-                className="w-full h-13 py-3.5 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white rounded-2xl font-extrabold text-sm shadow-[0_0_25px_rgba(6,182,212,0.3)] hover:shadow-[0_0_35px_rgba(6,182,212,0.45)] transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 group"
+                className="w-full h-13 py-3.5 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 dark:from-cyan-600 dark:to-cyan-500 hover:opacity-95 text-white rounded-2xl font-extrabold text-sm shadow-lg shadow-orange-500/20 dark:shadow-cyan-500/20 btn-interactive flex items-center justify-center gap-2 disabled:opacity-50 group"
               >
                 {isUploading ? (
                   <>
