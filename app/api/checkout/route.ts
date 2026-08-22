@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { getGlobalPricing, getPriceForTierAndCurrency, ResolutionTier, CurrencyCode } from "@/lib/pricing";
 
 function getBaseUrl(req: Request): string {
   // 1. Try origin header (sent automatically by browser on fetch POST)
@@ -49,11 +50,19 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { orderId, tier, currency, amount, customerEmail, userId, enhancementType } = body;
+    const { orderId, tier, currency, customerEmail, userId, enhancementType } = body;
 
-    if (!orderId || !tier || !currency || !amount) {
+    if (!orderId || !tier || !currency) {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 });
     }
+
+    // ── Verify Price Directly Against Global Database / Store Pricing ──
+    const globalPricing = await getGlobalPricing();
+    const verifiedPrice = getPriceForTierAndCurrency(
+      globalPricing,
+      tier as ResolutionTier,
+      currency as CurrencyCode
+    );
 
     const stripeKey = process.env.STRIPE_SECRET_KEY;
 
@@ -70,8 +79,8 @@ export async function POST(req: Request) {
       apiVersion: "2025-02-24.acacia",
     });
 
-    // Convert amount to cents / smallest currency unit
-    const unitAmount = Math.round(amount * 100);
+    // Convert verified price to cents / smallest currency unit
+    const unitAmount = Math.round(verifiedPrice * 100);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -97,6 +106,7 @@ export async function POST(req: Request) {
         userId: userId || "guest",
         resolutionTier: tier,
         enhancementType: enhancementType || "general",
+        amountPaid: verifiedPrice.toString(),
       },
     });
 

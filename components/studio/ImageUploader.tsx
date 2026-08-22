@@ -13,18 +13,26 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { getAllPricingTiersDynamic, getAllPricingTiers, PricingInfo } from "@/lib/pricing";
+import { 
+  getAllPricingTiersDynamic, 
+  getPricingTiersFromConfig, 
+  PricingInfo, 
+  PricingConfig, 
+  DEFAULT_PRICING 
+} from "@/lib/pricing";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export interface StudioImageUploaderProps {
   countryCode?: string;
   initialTier?: string;
+  initialPricing?: PricingConfig;
 }
 
 export function StudioImageUploader({
   countryCode = "US",
   initialTier = "4k",
+  initialPricing = DEFAULT_PRICING,
 }: StudioImageUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -42,8 +50,10 @@ export function StudioImageUploader({
   const [isCheckedUser, setIsCheckedUser] = useState(false);
 
   // Pricing
-  const [pricingTiers, setPricingTiers] = useState<PricingInfo[]>(getAllPricingTiers(countryCode));
-  const [isLoadingPricing, setIsLoadingPricing] = useState(true);
+  const [pricingTiers, setPricingTiers] = useState<PricingInfo[]>(
+    getPricingTiersFromConfig(initialPricing, countryCode)
+  );
+  const [isLoadingPricing, setIsLoadingPricing] = useState(false);
 
   const activePricing = pricingTiers.find((t) => t.tier === selectedTier) || pricingTiers[1];
   const supabase = createClient();

@@ -2,10 +2,12 @@ export const dynamic = 'force-dynamic';
 
 import { headers } from "next/headers";
 import { PricingClient } from "./PricingClient";
+import { getGlobalPricing } from "@/lib/pricing";
 
-export default function PricingPage() {
+export default async function PricingPage() {
   const headersList = headers();
   const countryCode = headersList.get('x-user-country') || 'US';
+  const initialPricing = await getGlobalPricing();
 
   return (
     <>
@@ -17,7 +19,7 @@ export default function PricingPage() {
       </div>
 
       <main className="relative z-10 pt-24 pb-32">
-        <PricingClient initialCountryCode={countryCode} />
+        <PricingClient initialCountryCode={countryCode} initialPricing={initialPricing} />
       </main>
     </>
   );

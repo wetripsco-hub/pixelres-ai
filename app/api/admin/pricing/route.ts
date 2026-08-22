@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { isAdmin } from '@/app/(admin)/admin/actions';
 import { getPricingSettings, savePricingSettings, PricingSetting } from '@/lib/pricing-store';
 
@@ -44,11 +45,22 @@ async function handleUpdatePricing(req: Request) {
 
     const result = await savePricingSettings(tiers as PricingSetting[]);
 
+    // Bust Next.js cache globally
+    try {
+      revalidatePath('/', 'layout');
+      revalidatePath('/pricing');
+      revalidatePath('/studio');
+      revalidatePath('/dashboard');
+      revalidatePath('/admin');
+    } catch (e) {
+      // Revalidation in route handler
+    }
+
     return NextResponse.json({
       success: true,
       message: result.savedToDb
-        ? "Pricing updated in database and local cache successfully!"
-        : "Pricing saved to active server store successfully!",
+        ? "Pricing updated globally in database & store successfully!"
+        : "Pricing saved and revalidated across all platform pages!",
       savedToDb: result.savedToDb,
     });
   } catch (err: any) {

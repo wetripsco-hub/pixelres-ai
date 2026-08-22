@@ -3,20 +3,29 @@
 import React, { useState, useEffect } from "react";
 import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slider";
 import { Zap, Layers, Cpu, ArrowRight, Globe, Star, Sparkles, Printer, ScanFace, Cloud, Banknote } from "lucide-react";
-import { ResolutionTier, getAllPricingTiers, PricingInfo } from "@/lib/pricing";
+import { 
+  ResolutionTier, 
+  getPricingTiersFromConfig, 
+  getAllPricingTiersDynamic, 
+  PricingInfo, 
+  PricingConfig, 
+  DEFAULT_PRICING 
+} from "@/lib/pricing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 interface MarketingClientProps {
   initialCountryCode: string;
+  initialPricing?: PricingConfig;
 }
 
-export function MarketingClient({ initialCountryCode }: MarketingClientProps) {
+export function MarketingClient({ initialCountryCode, initialPricing = DEFAULT_PRICING }: MarketingClientProps) {
   const [selectedTier, setSelectedTier] = useState<ResolutionTier>("4k");
   const [countryCode, setCountryCode] = useState(initialCountryCode);
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig>(initialPricing);
 
-  // Client-side Geo-IP fallback
+  // Client-side Geo-IP fallback & live pricing fetch
   useEffect(() => {
     fetch('https://ipapi.co/json/')
       .then(res => res.json())
@@ -26,9 +35,15 @@ export function MarketingClient({ initialCountryCode }: MarketingClientProps) {
         }
       })
       .catch(err => console.error('Geo-IP fetch failed:', err));
-  }, []);
 
-  const pricingTiers = getAllPricingTiers(countryCode);
+    getAllPricingTiersDynamic(countryCode).then(tiers => {
+      if (tiers && tiers.length > 0) {
+        // dynamic pricing active
+      }
+    });
+  }, [countryCode]);
+
+  const pricingTiers = getPricingTiersFromConfig(pricingConfig, countryCode);
 
   const scrollToUpload = (tier?: ResolutionTier) => {
     if (tier) setSelectedTier(tier);

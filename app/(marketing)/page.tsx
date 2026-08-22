@@ -2,10 +2,12 @@ export const dynamic = 'force-dynamic';
 
 import { headers } from "next/headers";
 import { MarketingClient } from "./MarketingClient";
+import { getGlobalPricing } from "@/lib/pricing";
 
-export default function MarketingPage() {
+export default async function MarketingPage() {
   const headersList = headers();
   const countryCode = headersList.get('x-user-country') || 'US';
+  const initialPricing = await getGlobalPricing();
 
   return (
     <div className="min-h-screen bg-[#090A0F] text-slate-50 selection:bg-cyan-900/50 selection:text-cyan-50 font-sans overflow-hidden relative">
@@ -27,7 +29,7 @@ export default function MarketingPage() {
       </div>
 
       <main className="relative z-10">
-        <MarketingClient initialCountryCode={countryCode} />
+        <MarketingClient initialCountryCode={countryCode} initialPricing={initialPricing} />
       </main>
     </div>
   );

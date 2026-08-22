@@ -1,147 +1,88 @@
-export type ResolutionTier = 'web' | '4k' | '8k';
-export type CurrencyCode = 'USD' | 'PKR' | 'INR';
+import { createClient } from '@supabase/supabase-js';
 
-export interface PricingInfo {
-  tier: ResolutionTier;
-  label: string;
-  description: string;
-  price: number;
-  formattedPrice: string;
-  currency: CurrencyCode;
-}
+export * from './pricing-types';
+import { 
+  PricingConfig, 
+  DEFAULT_PRICING, 
+  PricingInfo, 
+  getPricingTiersFromConfig 
+} from './pricing-types';
 
-export const RESOLUTION_TIERS = {
-  web: {
-    id: 'web' as ResolutionTier,
-    label: 'Web & Social',
-    description: '~2000px',
-  },
-  '4k': {
-    id: '4k' as ResolutionTier,
-    label: '4K Ultra HD',
-    description: '~4000px',
-  },
-  '8k': {
-    id: '8k' as ResolutionTier,
-    label: '8K Print-Ready',
-    description: '~8000px, 300 DPI',
-  },
-};
+// ── Central Dynamic Pricing Fetcher ────────────────────────────────
 
-// Fallback pricing used when Supabase or API is unreachable
-const FALLBACK_PRICING_DATA: Record<CurrencyCode, Record<ResolutionTier, number>> = {
-  USD: {
-    web: 1.99,
-    '4k': 4.99,
-    '8k': 9.99,
-  },
-  PKR: {
-    web: 499,
-    '4k': 1299,
-    '8k': 2499,
-  },
-  INR: {
-    web: 149,
-    '4k': 399,
-    '8k': 799,
-  },
-};
-
-export function getCurrencyForCountry(countryCode: string): CurrencyCode {
-  const upperCode = countryCode.toUpperCase();
-  if (upperCode === 'PK') return 'PKR';
-  if (upperCode === 'IN') return 'INR';
-  return 'USD';
-}
-
-export function formatPrice(price: number, currency: CurrencyCode): string {
-  if (currency === 'USD') return `$${price.toFixed(2)}`;
-  if (currency === 'PKR') return `Rs. ${price.toLocaleString()}`;
-  if (currency === 'INR') return `₹${price.toLocaleString()}`;
-  return `${price} ${currency}`;
-}
-
-// ── Synchronous (fallback / SSR initial values) ──────────────────────
-
-export function getPricingForTier(tier: ResolutionTier, countryCode: string = 'US'): PricingInfo {
-  const currency = getCurrencyForCountry(countryCode);
-  const price = FALLBACK_PRICING_DATA[currency][tier];
-
-  return {
-    tier,
-    label: RESOLUTION_TIERS[tier].label,
-    description: RESOLUTION_TIERS[tier].description,
-    price,
-    formattedPrice: formatPrice(price, currency),
-    currency,
-  };
-}
-
-export function getAllPricingTiers(countryCode: string = 'US'): PricingInfo[] {
-  return [
-    getPricingForTier('web', countryCode),
-    getPricingForTier('4k', countryCode),
-    getPricingForTier('8k', countryCode),
-  ];
-}
-
-// ── Dynamic Pricing Fetcher ────────────────────────────────────────
-
-export async function fetchDynamicPricing(): Promise<Record<CurrencyCode, Record<ResolutionTier, number>>> {
-  try {
-    // Try internal /api/admin/pricing endpoint
-    const baseUrl = typeof window !== 'undefined'
-      ? window.location.origin
-      : process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-
-    const res = await fetch(`${baseUrl}/api/admin/pricing`, {
-      cache: 'no-store',
-    }).catch(() => null);
-
-    if (res && res.ok) {
-      const data = await res.json().catch(() => null);
-      if (data && Array.isArray(data.tiers) && data.tiers.length > 0) {
-        const result: Record<CurrencyCode, Record<ResolutionTier, number>> = {
-          USD: { web: 0, '4k': 0, '8k': 0 },
-          PKR: { web: 0, '4k': 0, '8k': 0 },
-          INR: { web: 0, '4k': 0, '8k': 0 },
-        };
-
-        for (const row of data.tiers) {
-          const tier = row.id as ResolutionTier;
-          if (tier === 'web' || tier === '4k' || tier === '8k') {
-            result.USD[tier] = Number(row.usd_price);
-            result.PKR[tier] = Number(row.pkr_price);
-            result.INR[tier] = Number(row.inr_price);
+export async function getGlobalPricing(): Promise<PricingConfig> {
+  // 1. Client-Side (Browser Environment)
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/admin/pricing', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.tiers) && data.tiers.length > 0) {
+          const config: PricingConfig = JSON.parse(JSON.stringify(DEFAULT_PRICING));
+          for (const s of data.tiers) {
+            if (s.id === 'web' || s.id === '4k' || s.id === '8k') {
+              config[s.id as 'web' | '4k' | '8k'] = {
+                usd: Number(s.usd_price),
+                pkr: Number(s.pkr_price),
+                inr: Number(s.inr_price),
+              };
+            }
           }
-        }
-
-        if (result.USD.web > 0 || result.USD['4k'] > 0 || result.USD['8k'] > 0) {
-          return result;
+          return config;
         }
       }
+    } catch {
+      // Fallback
     }
-
-    return FALLBACK_PRICING_DATA;
-  } catch {
-    return FALLBACK_PRICING_DATA;
   }
+
+  // 2. Server-side: Fetch directly from Supabase
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('placeholder')) {
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+      // Try app_settings table
+      const { data: appData } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'pricing_config')
+        .single();
+
+      if (appData?.value?.web && appData?.value?.['4k'] && appData?.value?.['8k']) {
+        return appData.value as PricingConfig;
+      }
+
+      // Try pricing_settings table
+      const { data: pricingData } = await supabase
+        .from('pricing_settings')
+        .select('*');
+
+      if (pricingData && pricingData.length > 0) {
+        const config: PricingConfig = JSON.parse(JSON.stringify(DEFAULT_PRICING));
+        for (const row of pricingData) {
+          if (row.id === 'web' || row.id === '4k' || row.id === '8k') {
+            config[row.id as 'web' | '4k' | '8k'] = {
+              usd: Number(row.usd_price),
+              pkr: Number(row.pkr_price),
+              inr: Number(row.inr_price),
+            };
+          }
+        }
+        return config;
+      }
+    }
+  } catch {
+    // Fallback to default
+  }
+
+  return DEFAULT_PRICING;
 }
 
+// Dynamic tiers fetcher
 export async function getAllPricingTiersDynamic(countryCode: string = 'US'): Promise<PricingInfo[]> {
-  const pricingData = await fetchDynamicPricing();
-  const currency = getCurrencyForCountry(countryCode);
-
-  const tiers: ResolutionTier[] = ['web', '4k', '8k'];
-  return tiers.map((tier) => {
-    const price = pricingData[currency][tier] || FALLBACK_PRICING_DATA[currency][tier];
-    return {
-      tier,
-      label: RESOLUTION_TIERS[tier].label,
-      description: RESOLUTION_TIERS[tier].description,
-      price,
-      formattedPrice: formatPrice(price, currency),
-      currency,
-    };
-  });
+  const config = await getGlobalPricing();
+  return getPricingTiersFromConfig(config, countryCode);
 }

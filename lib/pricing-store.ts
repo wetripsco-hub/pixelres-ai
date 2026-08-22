@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { PricingConfig, DEFAULT_PRICING } from './pricing-types';
 
 export interface PricingSetting {
   id: 'web' | '4k' | '8k';
@@ -9,19 +10,63 @@ export interface PricingSetting {
   inr_price: number;
 }
 
-const DEFAULT_PRICING: PricingSetting[] = [
-  { id: 'web', usd_price: 1.99, pkr_price: 499, inr_price: 149 },
+export const DEFAULT_PRICING_SETTINGS: PricingSetting[] = [
+  { id: 'web', usd_price: 1.99, pkr_price: 300, inr_price: 149 },
   { id: '4k', usd_price: 4.99, pkr_price: 1299, inr_price: 399 },
   { id: '8k', usd_price: 9.99, pkr_price: 2499, inr_price: 799 },
 ];
 
 const LOCAL_STORAGE_FILE = path.join(process.cwd(), 'data', 'pricing_settings.json');
 
-// Read current pricing settings
+// Converts PricingSetting[] array to PricingConfig object
+export function settingsToConfig(settings: PricingSetting[]): PricingConfig {
+  const config: PricingConfig = JSON.parse(JSON.stringify(DEFAULT_PRICING));
+  for (const s of settings) {
+    if (s.id === 'web' || s.id === '4k' || s.id === '8k') {
+      config[s.id] = {
+        usd: Number(s.usd_price),
+        pkr: Number(s.pkr_price),
+        inr: Number(s.inr_price),
+      };
+    }
+  }
+  return config;
+}
+
+// Converts PricingConfig object to PricingSetting[] array
+export function configToSettings(config: PricingConfig): PricingSetting[] {
+  return [
+    { id: 'web', usd_price: config.web.usd, pkr_price: config.web.pkr, inr_price: config.web.inr },
+    { id: '4k', usd_price: config['4k'].usd, pkr_price: config['4k'].pkr, inr_price: config['4k'].inr },
+    { id: '8k', usd_price: config['8k'].usd, pkr_price: config['8k'].pkr, inr_price: config['8k'].inr },
+  ];
+}
+
+// Read current pricing settings (checks Supabase app_settings, pricing_settings, and local store)
 export async function getPricingSettings(): Promise<PricingSetting[]> {
+  const adminClient = createAdminClient();
+
+  // 1. Try Supabase app_settings (key: pricing_config)
   try {
-    // 1. Try Supabase
-    const adminClient = createAdminClient();
+    const { data: appData, error: appError } = await adminClient
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'pricing_config')
+      .single();
+
+    if (!appError && appData?.value) {
+      if (Array.isArray(appData.value)) {
+        return appData.value as PricingSetting[];
+      } else if (appData.value.web && appData.value['4k'] && appData.value['8k']) {
+        return configToSettings(appData.value as PricingConfig);
+      }
+    }
+  } catch (e) {
+    // app_settings not available
+  }
+
+  // 2. Try Supabase pricing_settings table
+  try {
     const { data, error } = await adminClient
       .from('pricing_settings')
       .select('*')
@@ -31,10 +76,10 @@ export async function getPricingSettings(): Promise<PricingSetting[]> {
       return data as PricingSetting[];
     }
   } catch (e) {
-    // Supabase query failed or table missing
+    // pricing_settings not available
   }
 
-  // 2. Try Local File Storage
+  // 3. Try Local File Storage
   try {
     if (fs.existsSync(LOCAL_STORAGE_FILE)) {
       const raw = fs.readFileSync(LOCAL_STORAGE_FILE, 'utf-8');
@@ -47,11 +92,11 @@ export async function getPricingSettings(): Promise<PricingSetting[]> {
     // File read error
   }
 
-  // 3. Fallback to default
-  return DEFAULT_PRICING;
+  // 4. Fallback to default
+  return DEFAULT_PRICING_SETTINGS;
 }
 
-// Save pricing settings
+// Save pricing settings to all stores
 export async function savePricingSettings(tiers: PricingSetting[]): Promise<{ success: boolean; savedToDb: boolean; error?: string }> {
   let savedToDb = false;
 
@@ -66,9 +111,28 @@ export async function savePricingSettings(tiers: PricingSetting[]): Promise<{ su
     console.error('Failed to write pricing to local file:', err);
   }
 
-  // 2. Try to sync to Supabase table
+  const adminClient = createAdminClient();
+  const config = settingsToConfig(tiers);
+
+  // 2. Try saving to Supabase app_settings (key: pricing_config)
   try {
-    const adminClient = createAdminClient();
+    const { error: appErr } = await adminClient
+      .from('app_settings')
+      .upsert({
+        key: 'pricing_config',
+        value: config,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' });
+
+    if (!appErr) {
+      savedToDb = true;
+    }
+  } catch (e) {
+    // app_settings not created yet
+  }
+
+  // 3. Try saving to Supabase pricing_settings table
+  try {
     for (const tier of tiers) {
       const { error } = await adminClient
         .from('pricing_settings')
@@ -88,7 +152,7 @@ export async function savePricingSettings(tiers: PricingSetting[]): Promise<{ su
       }
     }
   } catch (err: any) {
-    console.warn('Supabase pricing_settings table not available yet, using local store:', err.message);
+    // pricing_settings table not available
   }
 
   return { success: true, savedToDb };

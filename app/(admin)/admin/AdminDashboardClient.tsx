@@ -234,6 +234,7 @@ export function AdminDashboardClient({
         type: "success",
         text: data?.message || "Multi-currency rates successfully updated and saved!"
       });
+      router.refresh();
       setTimeout(() => setPricingMessage(null), 5000);
     } catch (error: any) {
       setPricingMessage({ type: "error", text: error.message || "Failed to update pricing." });

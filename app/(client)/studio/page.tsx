@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { headers } from "next/headers";
 import { Suspense } from "react";
 import { StudioImageUploader } from "@/components/studio/ImageUploader";
@@ -5,8 +7,9 @@ import { Sparkles, Shield } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { getGlobalPricing } from "@/lib/pricing";
 
-export default function StudioPage({
+export default async function StudioPage({
   searchParams,
 }: {
   searchParams: { tier?: string };
@@ -14,6 +17,7 @@ export default function StudioPage({
   const headersList = headers();
   const countryCode = headersList.get("x-user-country") || "US";
   const initialTier = searchParams.tier || "4k";
+  const initialPricing = await getGlobalPricing();
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#07090E] dark:text-slate-50 font-sans flex flex-col relative overflow-hidden transition-colors duration-200 selection:bg-cyan-500/30">
@@ -82,6 +86,7 @@ export default function StudioPage({
           <StudioImageUploader
             countryCode={countryCode}
             initialTier={initialTier}
+            initialPricing={initialPricing}
           />
         </Suspense>
       </main>

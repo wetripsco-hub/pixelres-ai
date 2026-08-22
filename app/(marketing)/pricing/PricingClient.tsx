@@ -2,17 +2,31 @@
 
 import React, { useState, useEffect } from "react";
 import { CheckCircle2, HelpCircle, Loader2 } from "lucide-react";
-import { getAllPricingTiersDynamic, PricingInfo } from "@/lib/pricing";
+import { 
+  getPricingTiersFromConfig, 
+  getAllPricingTiersDynamic, 
+  PricingInfo, 
+  PricingConfig, 
+  DEFAULT_PRICING 
+} from "@/lib/pricing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
-export function PricingClient({ initialCountryCode }: { initialCountryCode: string }) {
+interface PricingClientProps {
+  initialCountryCode: string;
+  initialPricing?: PricingConfig;
+}
+
+export function PricingClient({ initialCountryCode, initialPricing = DEFAULT_PRICING }: PricingClientProps) {
   const [countryCode, setCountryCode] = useState(initialCountryCode);
-  const [pricingTiers, setPricingTiers] = useState<PricingInfo[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig>(initialPricing);
+  const [pricingTiers, setPricingTiers] = useState<PricingInfo[]>(
+    getPricingTiersFromConfig(initialPricing, initialCountryCode)
+  );
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     fetch('https://ipapi.co/json/')
@@ -27,11 +41,9 @@ export function PricingClient({ initialCountryCode }: { initialCountryCode: stri
 
   useEffect(() => {
     let isMounted = true;
-    setIsLoading(true);
     getAllPricingTiersDynamic(countryCode).then(tiers => {
-      if (isMounted) {
+      if (isMounted && tiers && tiers.length > 0) {
         setPricingTiers(tiers);
-        setIsLoading(false);
       }
     });
     return () => { isMounted = false };
