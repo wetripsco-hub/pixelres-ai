@@ -114,10 +114,10 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error("Error creating checkout session:", err);
 
-    const orderId = (await req.clone().json().catch(() => ({})))?.orderId || "unknown";
-
-    return NextResponse.json({
-      url: `${baseUrl}/dashboard?payment=success&order_id=${orderId}`,
-    });
+    // Return a proper error so the client-side can display it to the user
+    return NextResponse.json(
+      { error: err.message || "Failed to create checkout session. Please try again." },
+      { status: 500 }
+    );
   }
 }

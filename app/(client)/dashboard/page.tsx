@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { DashboardClient } from "./DashboardClient";
+import { GuestSuccessClient } from "./GuestSuccessClient";
 
 export default async function DashboardPage({
   searchParams,
@@ -10,14 +11,36 @@ export default async function DashboardPage({
   searchParams?: { order_id?: string; payment?: string };
 }) {
   const supabase = await createClient();
-
   const { data: { session } } = await supabase.auth.getSession();
 
+  const adminClient = createAdminClient();
+  const headersList = headers();
+  const countryCode = headersList.get("x-user-country") || "US";
+
+  // ── Guest user arriving after checkout (no session) ──
+  // Show a lightweight guest success page instead of redirecting to /login
   if (!session) {
+    // If they have payment=success + order_id, show success confirmation
+    if (searchParams?.payment === "success" && searchParams?.order_id) {
+      const { data: order } = await adminClient
+        .from("orders")
+        .select("id, status, target_resolution, enhancement_type, currency, amount_paid, created_at, guest_email")
+        .eq("id", searchParams.order_id)
+        .maybeSingle();
+
+      return (
+        <GuestSuccessClient
+          order={order}
+          countryCode={countryCode}
+        />
+      );
+    }
+
+    // No payment context — redirect to login
     redirect("/login");
   }
 
-  const adminClient = createAdminClient();
+  // ── Authenticated user flow ──
   const userId = session.user.id;
   const userEmail = session.user.email;
 
@@ -52,9 +75,6 @@ export default async function DashboardPage({
   }
 
   const { data: orders } = await orderQuery;
-
-  const headersList = headers();
-  const countryCode = headersList.get("x-user-country") || "US";
 
   return (
     <DashboardClient
