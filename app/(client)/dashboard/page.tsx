@@ -11,7 +11,8 @@ export default async function DashboardPage({
   searchParams?: { order_id?: string; payment?: string };
 }) {
   const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  // getUser() verifies the token with Supabase; getSession() only trusts the cookie.
+  const { data: { user } } = await supabase.auth.getUser();
 
   const adminClient = createAdminClient();
   const headersList = headers();
@@ -19,7 +20,7 @@ export default async function DashboardPage({
 
   // ── Guest user arriving after checkout (no session) ──
   // Show a lightweight guest success page instead of redirecting to /login
-  if (!session) {
+  if (!user) {
     // If they have payment=success + order_id, show success confirmation
     if (searchParams?.payment === "success" && searchParams?.order_id) {
       const { data: order } = await adminClient
@@ -41,24 +42,28 @@ export default async function DashboardPage({
   }
 
   // ── Authenticated user flow ──
-  const userId = session.user.id;
-  const userEmail = session.user.email;
+  const userId = user.id;
+  const userEmail = user.email;
 
-  // 1. Auto-link guest order on payment success / returning with order_id
+  // 1. Link the order they just paid for. The order id is an unguessable UUID, so only
+  //    its buyer knows it; it can only be linked if it has no owner and the email matches (or is empty).
   if (searchParams?.order_id) {
     await adminClient
       .from("orders")
       .update({ user_id: userId, guest_email: userEmail || null })
       .eq("id", searchParams.order_id)
-      .is("user_id", null);
+      .is("user_id", null)
+      .or(userEmail ? `guest_email.is.null,guest_email.eq.${userEmail}` : "guest_email.is.null");
   }
 
-  // 2. Auto-link any unlinked guest orders matching user's email or with empty email
+  // 2. Link earlier guest orders ONLY when the email matches exactly.
+  //    (The old code also grabbed every order with an empty email, handing other
+  //    customers' orders to whoever logged in first.)
   if (userEmail) {
     await adminClient
       .from("orders")
-      .update({ user_id: userId, guest_email: userEmail })
-      .or(`guest_email.eq.${userEmail},guest_email.is.null`)
+      .update({ user_id: userId })
+      .eq("guest_email", userEmail)
       .is("user_id", null);
   }
 

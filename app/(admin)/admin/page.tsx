@@ -42,9 +42,10 @@ export default async function AdminPage() {
     metrics.totalOrders = orders.length
     orders.forEach(order => {
       if (order.status === 'completed') metrics.completedJobs++;
-      if (order.status === 'pending' || order.status === 'processing') metrics.pendingJobs++;
+      if (order.status === 'processing') metrics.pendingJobs++;
 
-      if (order.status !== 'failed') {
+      // Only paid orders count as revenue (pending = not paid yet)
+      if (order.status === 'processing' || order.status === 'completed') {
         if (order.currency === 'USD') metrics.totalUsdRevenue += order.amount_paid;
         if (order.currency === 'PKR') metrics.totalPkrRevenue += order.amount_paid;
         if (order.currency === 'INR') metrics.totalInrRevenue += order.amount_paid;

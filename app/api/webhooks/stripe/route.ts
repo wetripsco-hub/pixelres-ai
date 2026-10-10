@@ -42,7 +42,8 @@ export async function POST(req: Request) {
           amount_paid: session.amount_total ? session.amount_total / 100 : 0,
           currency: session.currency?.toUpperCase() || 'USD'
         })
-        .eq('id', orderId);
+        .eq('id', orderId)
+        .eq('status', 'pending'); // idempotent: retries/duplicates must not reset a completed order
 
       if (error) {
         console.error('Error updating order status:', error);

@@ -24,15 +24,15 @@ export async function POST(req: Request) {
       }
     );
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json().catch(() => ({}));
     const orderId = body.orderId;
-    const userId = session.user.id;
-    const userEmail = session.user.email;
+    const userId = user.id;
+    const userEmail = user.email;
 
     const adminClient = createAdminClient();
 
@@ -51,12 +51,13 @@ export async function POST(req: Request) {
     }
 
     // 1. If specific orderId supplied, claim it
-    if (orderId) {
+    if (orderId && typeof orderId === "string") {
       await adminClient
         .from("orders")
         .update({ user_id: userId, guest_email: userEmail || null })
         .eq("id", orderId)
-        .is("user_id", null);
+        .is("user_id", null)
+        .or(userEmail ? `guest_email.is.null,guest_email.eq.${userEmail}` : "guest_email.is.null");
     }
 
     // 2. Claim all unlinked orders matching user's email

@@ -4,13 +4,12 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
+import { ADMIN_COOKIE, createAdminToken, pinMatches, verifyAdminToken } from "@/lib/admin-session"
 
 // Verify if the current session has admin rights via DB, Env, or PIN
 export async function isAdmin() {
   const cookieStore = cookies()
-  const pinCookie = cookieStore.get('admin_pin_access')?.value
-
-  if (pinCookie === 'true') {
+  if (verifyAdminToken(cookieStore.get(ADMIN_COOKIE)?.value)) {
     return true;
   }
 
@@ -19,9 +18,10 @@ export async function isAdmin() {
 
   if (!user) return false;
 
-  const adminEmails = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || 'wetrips.co@gmail.com')
+  const adminEmails = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || '')
     .split(',')
-    .map(e => e.trim().toLowerCase());
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
 
   if (user.email && adminEmails.includes(user.email.toLowerCase())) {
     return true;
@@ -38,10 +38,16 @@ export async function isAdmin() {
 }
 
 export async function verifyPin(pin: string) {
-  const correctPin = process.env.ADMIN_PIN || '1234'
-  if (pin === correctPin) {
+  if (typeof pin === 'string' && pinMatches(pin)) {
     const cookieStore = cookies()
-    cookieStore.set('admin_pin_access', 'true', { maxAge: 60 * 60 * 24, httpOnly: true, path: '/' })
+    const token = createAdminToken()
+    cookieStore.set(ADMIN_COOKIE, token.value, {
+      maxAge: token.maxAge,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    })
     revalidatePath('/admin')
     return { success: true }
   }
